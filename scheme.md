@@ -85,6 +85,15 @@ The first two parenthesized structures are definitions, they create top-level bi
   (let ((y 44))
     (+ x y)))     => 67
 
+While definitions are not expressions, but it has similar syntactic structure as compound expressions. At the purely syntactical level, both are forms, and form is the general name for a syntactic part of a Scheme program. In particular, 23 is a subform of the form (deinfe x 23).
 
+
+Procedures
+
+Definitions can also be used to define procedures:
+
+(define (f x)
+  (+ x 42))
+(f 23)             => 65
 
 
