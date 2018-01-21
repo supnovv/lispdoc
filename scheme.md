@@ -20,11 +20,10 @@ Scheme's model of arithmetic provides a rich set of numerical types and operatio
 
 Expressions
 
-The most important elements of Scheme code are expressions. Expressions can be evaluated producing a value. The most fundamental expressions are literal expressions (like #t, 23). Compound expressions are formed by placing parentheses around their subexpressions. The first subexpression identifies an operation; the remaing subexpression are operands to the operation, like (+ 23 42), (+ 14 15 (* 23 42)). As these examples indicate, compound expressions in Scheme are always written using the same prefix notation. As a consequence, the parentheses are needed to indicate structure. Consequently, "superfluous" parentheses, which are often permissible in mathematical notation and also in many programming languages, are not allowed in Scheme. As in many other languages, whitespace (inluding line endings) is not significant when it separates subexpressions of an expression, and can be used to indicate structure.
+The most important elements of Scheme code are expressions. Expressions can be evaluated producing a value. The most fundamental expressions are literal expressions like #t, 23. Compound expressions are formed by placing parentheses around their subexpressions. The first subexpression identifies an operation; the remaing subexpression are operands to the operation, like (+ 23 42), (+ 14 15 (* 23 42)). As these examples indicate, compound expressions in Scheme are always written using the same prefix notation. As a consequence, the parentheses are needed to indicate structure. Consequently, "superfluous" parentheses, which are often permissible in mathematical notation and also in many programming languages, are not allowed in Scheme. As in many other languages, whitespace (inluding line endings) is not significant when it separates subexpressions of an expression, and can be used to indicate structure.
 
 The syntax of Scheme code is organized in three levels. The **lexical syntax** that describes how a program text is split into a sequence of lexemes. The **datum syntax** formulated in terms of the lexical syntax, that structures the lexeme squence as a sequence of syntactic data, where a syntactic datum is a recursively structured entity. The **program syntax** formulated in terms of the read syntax, imposing further structure and assigning meaning to syntactic data.
 
-Scheme source code consists of syntactic data and comments. Syntactic data in Scheme source code are called forms. A form nested inside another form is called a subfrom. ...
 
 
 The formal syntax for Scheme is written in an extended BNF. Non-terminals are written using angle brackets. All spaces in the grammar are for legibility. <Empty> stands for the empty string. The following extensions to BNF are used to make the description more concise: <thing>* means zero or more occurrences of <thing>, and <thing>+ means at least one <thing>. Some non-terminal names refer to the Unicode scalar values of the same name: <character tabulation> (U+0009), <linefeed> (U+000A), <carriage return> (U+000D), (line tabulation> (U+000B), <form feed> (U+000C), <carriage return> (U+000D), <space> (U+0020), <next line> (U+0085), <line separator> (U+2028), and <paragraph separator> (U+2029).
@@ -32,6 +31,255 @@ The formal syntax for Scheme is written in an extended BNF. Non-terminals are wr
 The **lexical syntax** determines how a character sequence is split into a sequence of lexemes, omitting non-significant portions such as comments and whitespace. The character sequence is assumed to be text according to the Unicode standard. Some of the lexemes, such as identifiers, representations of number objects, strings etc., of the lexical syntax are syntactic data in the datum syntax, and thus represent objects. Besides the formal account of the syntax, this section also describes what datum values are represented by these syntactic data.
 
 
+``` dnf
+<letter>
+  : a...z
+  | A...Z
+<digit>
+  : 0...9
+<hex-digit>
+  : <digit>
+  | a...f
+  | A...F
+<digit2>
+  : 0...1
+<digit8>
+  : 0...7
+<digit10>
+  : <digit>
+<digit16>
+  : <hex-digit>
+<hex-scalar-value>
+  : <hex-digit>+
+<lexeme>
+  : <identifier>
+  | <boolean>
+  | <number>
+  | <character>
+  | <string>
+  | (
+  | )
+  | [
+  | ]
+  | #(
+  | #vu8(
+  | '
+  | `
+  | ,
+  | ,@
+  | .
+  | #'
+  | #`
+  | #,
+  | #,@
+<delimiter>
+  : (
+  | )
+  | [
+  | ]
+  | "
+  | ;
+  | #
+  | <whitespace>
+<whitespace>
+  : <character-tabulation>
+  | <linefeed>
+  | <line-tabulation>
+  | <form-feed>
+  | <carriage-return>
+  | <next-line>
+  | <any-character-whose-category-is-Zs-Zl-Zp>
+<line-ending>
+  : <linefeed>
+  | <carriage-return>
+  | <carriage-return> <linefeed>
+  | <carriage-return> <next-line>
+  | <next-line>
+  | <line-separator>
+<comment>
+  : ; <all-subsequent-character-up-to-a-line-ending-or-paragraph-separator>
+  | #; <interlexeme-space> <datum>
+  | #!r6rs
+  | <nested-comment>
+<nested-comment>
+  : #| <comment-text> <comment-cont>* |#
+<comment-text>
+  : <character-sequence-not-containg-#|-or-|#>
+<comment-cont>
+  : <nested-comment> <comment-text>
+<atmosphere>
+  : <whitespace>
+  | <comment>
+<interlexeme-space>
+  : <atmosphere>*
+<identifier>
+  : <initial> <subsequent>*
+  | <peculiar-identifier>
+<initial>
+  : <constituent>
+  | <special-initial>
+  | <inline-hex-escape>
+<constituent>
+  : <letter>
+  | <any-character-whose-unicode-scalar-value-is-greater-than-127-and-whose-category-is-Lu-Ll-Lt-Lm-Lo-Mn-Nl-No-Pd-Pc-Po-Sc-Sm-Sk-So-Co>
+<special-initial>
+  : !
+  | $
+  | %
+  | &
+  | *
+  | /
+  | :
+  | <
+  | =
+  | >
+  | ?
+  | ^
+  | _
+  | ~
+<inline-hex-escape>
+  : \x<hex-scalar-value>;
+<subsequent>
+  : <initial>
+  | <digit>
+  | <any-character-whose-category-is-Nd-Mc-Me>
+  | <special-subsequent>
+<special-subsequent>
+  : +
+  | -
+  | .
+  | @
+<peculiar-identifier>
+  : +
+  | -
+  | ...
+  | -> <subsequent>*
+<boolean>
+  : #t
+  | #T
+  | #f
+  | #F
+<character>
+  : #\<any-character>
+  | #\<character-name>
+  | #\x<hex-scalar-value>
+<character-name>
+  : nul
+  | alarm
+  | backspace
+  | tab
+  | linefeed
+  | newline
+  | vtab
+  | page
+  | return
+  | esc
+  | space
+  | delete
+<string>
+  : " <string-element>* "
+<string-element>
+  : <any-character-other-thenn-"-or-\>
+  | \a
+  | \b
+  | \t
+  | \n
+  | \v
+  | \f
+  | \r
+  | \"
+  | \\
+  | \x<hex-scalar-value>;
+  | \<intraline-whitespace> <line-ending> <intraline-whitespace>
+<intraline-whitespace>
+  : <character-tabulation>
+  | <any-character-whose-category-is-Zs>
+
+<number>
+  : <num2>
+  | <num8>
+  | <num10>
+  | <num16>
+<numR>
+  : <prefixR> <complexR>
+<complexR>
+  : <realR>
+  | <realR> @ <realR>
+  | <realR> + <urealR> i
+  | <realR> - <urealR> i
+  | <realR> + <naninf> i
+  | <realR> - <naninf> i
+  | <realR> + i
+  | <realR> - i
+  | + <nrealR> i
+  | - <urealR> i
+  | + <naninf> i
+  | - <naninf> i
+  | + i
+  | - i
+<realR>
+  : <sign> <urealR>
+  | + <naninf>
+  | - <naninf>
+<urealR>
+  : <uintegerR>
+  | <uintegerR> / <uintegerR>
+  | <decimalR> <mantissa-width>
+<naninf>
+  : nan.0
+  | inf.0
+<decimal10>
+  : <uinteger10> <suffix>
+  | . <digit10>+ <suffix>
+  | <digit10>+ . <digit10>* <suffix>
+  | <digit10>+ . <suffix>
+<uintegerR>
+  : <digitR>+
+<prefixR>
+  : <radixR> <exactness>
+  | <exactness> <radixR>
+<suffix>
+  : <empty>
+  | <exponent-marker> <sign> <digit10>+
+<exponent-marker>
+  : e
+  | E
+  | s
+  | S
+  | f
+  | F
+  | d
+  | D
+  | l
+  | L
+<mantissa-width>
+  : <empty>
+  | | <digit10>+
+<sign>
+  : <empty>
+  | + 
+  | -
+<exactness>
+  : <empty>
+  | #i
+  | #I
+  | #e
+  | #E
+<radix2>
+  : #b
+  | #B
+<radix8>
+  : #o
+  | #O
+<radix10>
+  : <empty>
+  | #d
+  | #D
+<radix16>
+  : #x
+  | #X
+
+```
 
 
 
@@ -39,8 +287,15 @@ Basic types
 
 Scheme programs manipulate objects, which are also referred to as values. Scheme objects are organized into sets of values called types. Note: As Scheme is latently typed, the use of the term type in this report differs the use of the term in the context of other languages, particularly those with manifest typing.
 
-**Booleans** A boolean is a truth value, and can be either true or false. In Scheme, the object for "false" is written #f. The object for "true" is written #t. In most places where a truth value is expected, however, any object different from #f counts as true.
+**Booleans** A boolean is a truth value, and can be either true or false. In Scheme, the object for "false" is written #f. The object for "true" is written #t. Any Scheme value can be used as a boolean value for the purpose of a conditional test. In this test, all values count as true except for #f.
 
+``` dnf
+<boolean>
+  : #t
+  | #f
+  | #T
+  | #F
+```
 
 **Numbers** Scheme supports a rich variety of numerical data types, including objects representing integers of arbitrary precision, rational numbers, real numbers, complex numbers, and inexact numbers of various kinds.
 
@@ -100,11 +355,93 @@ Some Scheme implementations, specifically those that follow the IEEE floating-po
 
 **Characters** Scheme characters mostly correspond to textual characters. More precisely, they are isomorphic to the scalar values of the Unicode standard. 
 
+``` dnf
+<character>
+  : #\<any-character>
+  | #\<character-name>
+  | #\x<hex-scalar-value>
+<character-name>
+  : nul
+  | alarm
+  | backspace
+  | tab
+  | linefeed
+  | newline
+  | vtab
+  | page
+  | return
+  | esc
+  | space
+  | delete
+<hex-digit>
+  : 0...9
+  | a...f
+  | A...F
+<hex-scalar-value>
+  : <hex-digit>+
+<delimiter>
+  : (
+  | )
+  | [
+  | ]
+  | "
+  | ;
+  | #
+  | <whitespace>
+<whitespace>
+  : <character-tabulation>
+  | <linefeed>
+  | <line-tabulation>
+  | <form-feed>
+  | <carriage-return>
+  | <next-line>
+  | <any-character-whose-category-is-Zs-Zl-Zp>
+```
+
+Characters are represented using the notation #\<any-charater> or #\<character-name> or #\x<hex-scalar-value>. A <any-character> must be followed by a <delimiter> or by the end of the input. This rule resolves various ambiguous cases involving named characters, requiring, for example, the sequence of characters #\space to be interpreted as the space character rather than as the character #\s followed by the identifier pace. Note the #\newline notation is retained for backward compatibility. Its use is deprecated, #\linefeed should be used insteed.
 
 
+**Strings** Strings are finite sequences of characters with fixed length and thus represent arbitrary Unicode texts. 
 
-**Strings** Strings are finite sequences of characters with fixed length and thus represent arbitrary Unicode texts.
+``` dnf
+<string>
+  : " <string-element>* "
+<string-element>
+  : <any-character-other-thenn-"-or-\>
+  | \a
+  | \b
+  | \t
+  | \n
+  | \v
+  | \f
+  | \r
+  | \"
+  | \\
+  | \x<hex-scalar-value>;
+  | \<intraline-whitespace> <line-ending> <intraline-whitespace>
+<intraline-whitespace>
+  : <character-tabulation>
+  | <any-character-whose-category-is-Zs>
+<line-ending>
+  : <linefeed>
+  | <carriage-return>
+  | <carriage-return> <linefeed>
+  | <carriage-return> <next-line>
+  | <next-line>
+  | <line-separator>
+```
 
+Any other character (not list above) in a string after a backslash is a syntax violation. Except for a <line-ending>, any character outside of an escape sequence and not a douiblequote stands for itself in the string literal. A <line-ending> that does not follow a backslash stands for a linefeed character. For example:
+
+``` lisp
+"\x61;bc"      => "abc"
+
+"a\
+bc"            => "abc"
+
+"a
+bc"            => "a\nbc"
+```
 
 
 
@@ -126,6 +463,106 @@ This facilitates writing programs that operate on Scheme source code, in particu
 
 Pairs and lists, Vectors, Procedures
 
+
+复合数据（Datum syntax）
+
+The datum syntax describes the syntax of syntactic data in terms of a sequence of <lexeme>s, as defined in the lexical syntax. Syntactic data include the lexeme data described in the previous section as well as the following constructs for forming compound data: pairs and lists, eclosed by ( ) or [ ]; vectors; and bytevectors.
+
+``` dnf
+<datum>
+  : <lexeme-datum>
+  | <compound-datum>
+<lexeme-datum>
+  : <boolean>
+  | <number>
+  | <character>
+  | <string>
+  | <symbol>
+<symbol>
+  : <identifier>
+<compound-datum>
+  : <list>
+  | <vector>
+  | <bytevector>
+<list>
+  : (<datum>*)
+  | [<datum>*]
+  | (<datum>+ . <datum>)
+  | [<datum>+ . <datum>]
+  | <abbreviation>
+<abbreviation>
+  : <abbrev-prefix> <datum>
+<abbrev-prefix>
+  : '
+  | `
+  | ,
+  | ,@
+  | #'
+  | #`
+  | #,
+  | #,@
+<vector>
+  : #(<datum>*)
+<bytevector>
+  : #vu8(<u8>*)
+<u8>
+  : <any-number-representing-an-exact-integer-in-0...255>
+```
+
+The most general notation for Scheme pairs as syntactic data is the "dotted" notation (<datum1> . <datum2>) where <datum1> is the representation of the value of the car field and <datum2> is the representation of the value of the cdr field. A more streamlined notation can be used for list. The elements of the list are simply enclosed in parentheses and separated by spaces. The empty list is represented by (). For example, following are equivalent notations for a list of symbols.
+
+``` list
+(a b c d e)
+(a . (b . (c . (d . (e . ())))))
+```
+
+Note that the datum above is just a textual representation, not a expression that can evaluate a value. Using ' can transform the textual representation to the expression. For example:
+
+``` lisp
+'23                       => 23
+'#t                       => #t
+'foo                      => foo
+'(1 2 3)                  => (1 2 3)
+'#(1 2 3)                 => #(1 2 3)
+'(+ 23 42)                => (+ 23 42)
+'(define (f x) (+ x 42))  => (define (f x) (+ x 42))
+```
+
+The ' in the previous examples are not needed for representations of number objects or booleans. The 'foo is a symbol with name "foo", foo is a identifier has a real value associated with in it. And (1 2 3), #(1 2 3) are only textual representations, '(1 2 3) and '#(1 2 3) are literal expressions. The ' in procedure call and definition are also not needed.
+
+Syntactic data is also called external representations, and Scheme's libarary provides the get-datum and put-datum procedures for reading and writing syntactic data, converting between their textual representation and the corresponding objects. A syntacitic datum can be used in a program to obtain the corresponding datum value using quote.
+
+Syntactic data in Sheme source code are called forms. A form nested inside another form is called a subform. Consequently, Scheme's syntax has the property that any sequence of characters that is a form is also a syntactic datum representing some object. This can be load to confusion, since it may not be obvious out of context whether a give sequence of characters is intended to be a representation of objects or the text of a program. It is also a source of power, since it facilitates writing programs such as interpreters or compilers that treat programs as objects or vice versa.
+
+
+
+
+
+Semantic concepts
+
+A Scheme program consists of a top-level program together with a set of libraries, each of which defines a part of the program connected to the others through explicitly specified exports and imports. A library consists of a set of export and import sepcifications and a body, which consists of definitions, and expressions. A top-level program is similar to a library, but has no export specifications.
+
+A top-level program specifies an entry point for defining and running a Scheme program. A top-level program specifies a set of libraries to import and code to run. Through the imported libraries, whether directly or through the transitive closure of importing, a top-level program defines a complete Scheme program. A top-level program is a delimited piece of text, typically a file, that has the following form. And a <top-level-body-form> is either a <definition> or an <expression>.
+
+``` lisp
+(import <import-spec> ...)
+<top-level-body-form> ...
+```
+
+A library definition must have the following form:
+
+``` lisp
+(library <library-name>
+  (export <export-spec> ...)
+  (import <import-spec> ...)
+  <library-body>)
+```
+
+Within the body of a library or top-level program, an identifier may name a kind of syntax (called keyword or syntactic keyword), or it may name a location where a value can be stored (called variable). Certain forms are used to create syntactic abstractions and to bind keywords to transformers for those new syntactic abstractions, while other forms create new locations and bind variables to those locations. Collectively, these forms are called binding constructs. Some binding constructs take the form of definitions, while others are expressions.
+
+Expressions that bind variables include the lambda, let, let*, letrec, letrec*, let-values, and let*-values forms from the base library. Of these, lambda is the most fundamental. Expressions that bind keywords include the let-syntax and letrec-syntax forms. A define form is a definition that creates a variable binding, and a define-syntax form is a definition that creates a keyword binding.
+
+A Scheme expression can evaluate to an arbitrary finite number of values. These values are passed to the expression's continuation. Not all continuations accept any number of values. For example, a continuation that accept the argument to a procedure call is guaranteed to accept exactly one value. The effect of passing some other number of values to such a continuation is unspecified. The call-with-values procedure makes it possible to create continuations that accept specified numbers of return values.
 
 
 Variables
