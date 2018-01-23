@@ -682,6 +682,40 @@ A Scheme program is invoked via a top-level program. Like a library, a top-level
 
 
 
+A few form types are always availabel independent of imported libraries, however, including constant literals, variable references, procedure calls, and macro uses.
 
+Constant literals: <number>, <boolean>, <character>, <string>, <bytevector>. An expression consisting of a representation of a number object, a boolean, a character, a string, or a bytevector, evaluates "to itself". Noted that the value of a literal expression is immutable. Variable references: <variable>. An expression consisting of a variable is a variable reference if it is not a macro use. The value of the variable reference is the value stored in the location to which the variable is bound. It is a syntax violation to reference an unbound variable.
+
+Procedure calls: (<operator> <operand1> ...). A procedure call consists of expressions for the procedure to be called and the arguments to be passed to it, with enclosing parentheses. When a procedure call is evaluated, the operator and operand expressions are evaluated (in an unspecified order) and the resulting procedure is passed the resulting arguments. If the value of <operator> is not a procedure, an exception with condition type &assertion is raised. Also, if <operator> does not accept as many arguments as there are <operand>s, an exception with condition type &assertion is raised.
+
+Libraries and top-level programs can define and use new kinds of derived expressions and definitions called syntactic abstractions or macros. A syntactic abstraction is created by binding a keyword to a macro transformer or, simply, transformer. The transformer determines how a use of the macro is transcribed into a more primitive form. Macro uses have the form: (<keyword> <datum> ...), <keyword>, (set! <keyword> <datum>). The **define-syntax**, **let-syntax** and **letrec-syntax** forms can create bindings for keywords, associate them with macro transfers, and control the scope within which they are visible. The **syntax-rules** and **identifier-syntax** forms can create transformers via a pattern language. Moreover, the **syntax-case** form described in library chapter 12 allows creating transformers via arbitrary Scheme code.
+
+Macro uses are expanded into core forms at the start of eveluation (before compilation or interpretation) by a syntax expander. The set of core forms is implementation-dependent, as is the representation of these forms in the exapnder's output. If the expander encounters a syntactic abstraction, it invokes the associated transformer to expand the syntactic abstraction, then repeats the expansion process for the form returned by the transformer.
+
+Variable definitions: (define <variable> <expression>), (define <variable>), (define (<variable> <formals>) <body>), (define (<variable> . <formal>) <body>). The 2nd form is equivalent to (define <variable> <unspecified>) where <unspecified> is a side-effect-free expression returning an unspecified value. In the 3rd form, <formals> must be either a sequence of zero or more variables, or a sequence of one or more variables followed by a dot . and another variable. This form is equivalent to (deinfe <variable> (lambda (<formals>) <body>)). In the 4th form, <formal> must be a single variable. This form is equivalent to (define <variable> (lambda <formal> <body>)).
+
+Syntax definitions: (define-syntax <keyword> <expression>). It binds <keyword> to the value of <expression>, which must evaluate, at macro-expansion time, to a transformer. Macro transformer can be created using the syntax-rules and identifier-syntax forms.
+
+Quotation: (quote <datum>). It evalues to the datum value represented by <datum>. Noted that it may be abbreviated as '<datum>. For example:
+
+'"abc"             => string "abc"
+'145932            => number 145932
+'a                 => identifier a
+'#(a b c)          => vector #(a b c)
+'()                => empty list ()
+'(+ 1 2)           => procedure call (+ 1 2)
+'(quote a)         => (quote a)
+''a                => (quote a)
+
+Procedure: (lambda <formals> <body>). A lambda expression evaluation to a procedure. The environment in effect when the lambda expression is evaluated is remembered as part of the procedure. When the procedure is later called whith some arguments, the environment in which the lambda expression was evaluated is extended by binding the variables in the parameter list to fresh locations. <formals> must have one of the following forms. Any <variable> below must not appear more than once in <formals>.
+
+* (<variable1> ...): the procedure takes a fixed number of arguments;
+* <variable>: the procedure takes any number of arguments, when the procedure is called, the sequence of arguments is converted into a newly allocated list, and the list is stored in the binding of the <variable>;
+* (<variable1> ... <variablen> . <variablen+1>): if a period . precedes the last variable, then the procedure takes n or more arguments, where n is the number of parameters before the period (there must be at least one). The value stored in the binding of the last variable is a newly allocated list of the arguments left over after all the other arguemnts have been matched up against the other parameters.
+
+((lambda x x) 3 4 5 6)            => (3 4 5 6)
+((lambda (x y . z) z) 3 4 5 6)    => (5 6)
+
+Conditionals: (if <test> <consequent> <alternate>), (if <test> <consequent>).
 
 
