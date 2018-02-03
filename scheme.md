@@ -716,6 +716,117 @@ Procedure: (lambda <formals> <body>). A lambda expression evaluation to a proced
 ((lambda x x) 3 4 5 6)            => (3 4 5 6)
 ((lambda (x y . z) z) 3 4 5 6)    => (5 6)
 
-Conditionals: (if <test> <consequent> <alternate>), (if <test> <consequent>).
+Conditionals: (if <test> <consequent> <alternate>), (if <test> <consequent>). An if expression is evaluated as follows: first, <test> is evaluated. If it yields a true value, then <consequent> is evaluated and its values are returned. Otherwise <alternate> is evaluated and its values are returned. If <test> yields #f and no <alternate> is spcified, then the result of the expression is unspecified. The <consequent> and <alternate> expressions are in tail context if the if expression itself is.
+
+Assignments: (set! <variable> <expression>). <expression> is evaluated, and the resulting value is stored in the location to which <variable> is bound. The result of the set! expression is unspecified. It is a syntax violation if <variable> refers to an immutable binding.
+
+Derived conditionals: (cond <cond-clause1> <cond-clause2> ...), each <cond-clause> must be of the form (<test> <expression1> ...) or alternatively (<test> => <expression>). The last <cond-clause> may be an else clause: (else <expression1> ...). When a <test> evaluates to a true value, then the remaining <expression>s in its <cond-clause> are evaluated in order, and the result of the last <expression> in the <cond-clause> are returned as the results of the entire cond expression. If the selected <cond-clause> contains only the <test> and no <expression>s, then the value of the <test> is returned as the result. If the selected <cond-clause> uses the => alternate form, then the <expression> is evaluated. Its value must be a procedure, this procedure should accept one argument; it is called on the vlaue of the <test> and the values returned by this procedure are returned by the cond expression. If all <test>s evaluate to #f, and there is no else clause, then the conditional expression returns unspecified values; if there is an else clause, then its <expression>s are evaluated, and the values of the last one are returned. For a <cond-clause> of one of the following forms: (<test> <expression1> ...), (else <expression1> ...). The last <expression> is an tail context if the cond form itself is. For a (<test> => <expression>) form, the (implied) call to the procedure that results from the evaluation of <expression> is in a tail context if the cond from itself is.
+
+(case <key> <case-clause1> <case-clause2> ...), each <case-clause> must have one of the following forms: ((<datum1> ...) <expression1> <expression2> ...), (else <expression1> <expression2> ...). The second form which specifies an "else clause" may only appear as the last <case-clause>. Each <datum> is an external representation of some object. The data represented by the <datum>s need not be distinct. A case expression is evaluated as follows. <key> is evaluated and its result is compared using eqv? against the data represented by the <datum>s of each <case-clause> in turn, proceeding in order from left to right. If the result of evaluating <key> is equivalent to a datum of a <case-clause>, the corresponding <expression>s are evaluated from left to right and the results of the last expression in the <case-clause> are returned as the results of the case expression. If the result of evaluating <key> is different from every datum in each set, then if there is an else caluse its expressions are evaluated and the results of the last one the results of the case expression, otherwise the case expression returns unspecified values. The last <expression> of a <case-clause> is in tail context if the case expression itself is.
+
+(and <test1> ...), if there are no <test>s #t is returned. Otherwise, the <test> expressions are evaluated from left to right until a <test> result #f or the last <test> is reached. In the former case, the and expression returns #f without evaluating the remaining expressions. In the latter case, the last expression is evaluated and its values are returned. The last <test> expression is in tail context if the and expression itself is. (or <test1> ...), if there are no <test>s, #f is returned. Otherwise the <test> expressions are evaluated from left to right until a <test> returns a true value or the last <test> is reached. The last <test> expression is in tail context if the or expression itself is.
+
+The **binding constructs** described in this section create local bindings for variables that are visible only in a delimited region. The syntax of the constructs let, let*, letrec, and letrec* is identical, but they differ in the regions they establish for their variable bindings are computed. In a **let** expression, the initial values are computed before any of the variables become bound; in a let* expression, the bindings and evaluations are performed sequentially. In a **letrec** or letrec* expression, all the bindings are in effect while their initial values are being computed, thus allowing mutually recursive definitions. In a letrec expression, the initial values are computed before being assigned to the variables; in a letrec* the evaluations and assignments are performed sequentially. In addition, the binding constructs **let-values** and let*-value generalize let and let* to allow multiple variables to be bound to the results of expressions that evaluate to multiple values. They are analogons to let and let* in the way they establish regions; in a let-values expression, the initial values are computed before any of the variables become bound; in a let*-values expression, the bindings are performed sequentially.
+
+(let <bindings> <body>), <bindings> must have the form ((<variable1> <init1>) ...), where <init> is an expression. Any variable must not appear more than once in the <variable>s. Each binding of a <variable> has <body> as its region. (let* <bindings> <body>) is similar to the let, but the <init>s are evaluated and bindings created sequentially from left to right, with the region of each binding including the bindings to its right as well as <body>. Thus the second <init> is evaluated in an environment in which the first binding is visible and initialized, and so on. **Note** while the variables bound by a let expression must be distinct, the variables bound by a let* expression need not be distinct.
+
+(let ((x 2) (y 3))
+  (let ((x 7) (z (+ x y)))
+    (* z x)))                             ==> 35
+
+(let ((x 2) (y 3))
+  (let* ((x 7) (z (+ x y)))
+    (* z x)))                             ==> 70
+
+(let ((x 3) (x 4)) (+ x 1))               ==> duplicate bound variable x
+
+(let* ((x 3) (x 4)) (+ x 1))              ==> 5
+
+(letrec <bindings> <body>), any variable must not appear more than once in the <variable>s. Each binding of a <variable> has the entire letrec expression as its region, making it possible to define mutually recursive procedures. It should be possible to evaluate each <init> without assigning or referring to the value of any <variable>. In the most common ueses of letrec, all the <init>s are lambda expressions and the restriction is satisfied automatically. Another restriction is that the continuation of each <init> should not be invoked more than once. 
+
+(letrec ((even? (lambda (n) (if (zero? n) #t (odd? (- n 1)))))
+         (odd? (lambda (n) (if (zero? n) #f (even? (- n 1))))))
+  (even? 88))                             ==> #t
+
+(letrec* <bindings> <body>), any variable must not appear more than once in the <variable>s. The <variable>s are bound to fresh locations, each <variable> is assigned in left-to-right order to the result of evaluating the corresponding <init>. Despite the left-to-right evaluation and assignment order, each binding of a <variable> has the entire letrec* expression as its region, making it possible to define mutually recursive procedures. It must be possible to evaluate each <init> without assigning or referring to the value of the corresponding <variable> or the <variable> of any of the buildings that follow it in <bindings>. Another restriction is that the continuation of each <init> should not be invoked more than once.
+
+(letrec* ((p (lambda (x) (+ 1 (q (- x 1)))))
+          (q (lambda (y) (if (zero? y) 0 (+ 1 (p (- y 1))))))
+          (x (p 5))
+          (y x))
+  y)                                      ==> 5
+
+
+(let-values <mv-bindings> <body>), <mv-bindings> must have the form ((<formals1> <init1>) ...), where each <init> is an expression. Any variable must not appear more than once in the set of <formals>. Each binding of a variable has <body> as its region. If the <formals> do not match, an exception with condition type &assertion is raised. (let*-values <mv-bindings> <body>), in each <formals>, any variable must not appear more than once. The let*-values form is similar to let-values, but the <init>s are evaluated and bindings created sequentially from left to right, with the region of the bindings of each <formals> including the bindings to its right as well as <body>. Thus the second <init> is evaluated in an environment in which the bindings of the first <formals> is visible and initialized, and so on. Note: while all of the variables bound by a let-values expression must be distinct, the variables bound by different <formals> of a let*-values exprssion need not be distinct.
+
+(let-values (((a, b) (values 1 2))
+             ((c, d) (values 3 4)))
+  (list a b c d))                         ==> (1 2 3 4)
+
+(let-values (((a b . c) (values 1 2 3 4)))
+  (list a b c))                           ==> (1 2 (3 4))
+
+(let ((a 'a) (b 'b) (x 'x) (y 'y))
+  (let-values (((a b) (values x y))
+               ((x y) (values a b)))
+    (list a b x y)))                      ==> (x y a b)
+
+(let ((a 'a) (b 'b) (x 'x) (y 'y))
+  (let*-values (((a b) (values x y))
+                ((x y) (values a b)))
+    (list a b x y)))                      ==> (x y x y)
+
+let表达式总结
+* let每个<variable>的作用域都只在<body>中可见，每个<variable>对应的<init>求值顺序不定
+* let*每个<variable>的作用域包括下一个和后面的<variable>中以及<body>中可见，每个<variable>对应的<init>按从左到右的顺序求值
+* letrec每个<variable>的作用域在整个letrec表达式中都可见，每个<variable>对应的<init>求值顺序不定
+* letrec*每个<variable>的作用域在整个letrec表达式中都可见，每个<variable>对应的<init>按从左到右的顺序求值
+* let-values每个<variable>的作用域只在<body>中可见，每个<variable>对应的<init>求值顺序不定
+* let*-values每个<variable>的作用域包括下一个和后面的<formals>中以及<body>中可见，每个<init>按从左到右的顺序求值
+
+
+(begin <form> ...), (begin <expr> ...).
+
+(define x 0)
+(begin (set! x 5) (+ x 1))               ==> 6
+(begin (display "4 plus 1 equals ")
+       (display (+ 4 1)))                ==> unspecified, and prints   4 plus 1 equals 5
+
+**Equivalence predicates** A predicate is a procedure that always returns a boolean value #t or #f. And equivalence predicate is the computational analogue of mathematical equivalence relation. Of the equivalence predicates described in this section, eq? is the finest or most discriminating, and equal? is the coarsest. The eqv? predicate is slightly less discriminating than eq?.
+
+(eqv? obj1 obj2), the eqv? procedure defines a useful equivalence relation on objects. Briefly, it returns #t if obj1 and obj2 should normally be regarded as the same object and #f otherwise. This relation is left slightly open to interpretation, but the following partial specification of eqv? must hold for all implementations.
+
+The eqv? procedure returns #t if one of the following holds:
+* obj1 and obj2 are both booleans and are the same according to the boolean=? procedure;
+* obj1 and obj2 are both symbols and are the same according to the symbol=? procedure;
+* obj1 and obj2 are both exact number objects and are numerically equal;
+* obj1 and obj2 are both inexact number objects, are numerically equal, and yields the same results when passed as arguments to any other procedure that can be defined as a finite composition of Scheme's standard arithmetic procedures;
+* obj1 and obj2 are both characters and are the same character according to the char=? procedure; both obj1 and obj2 are the empty list;
+* obj1 and obj2 are objects such as pairs, vectors, bytevectors, strings, hashtables, records, ports, or hashtables that refer to the same location in the store;
+* obj1 and obj2 are record-type descriptors that are specified to be eqv? in library section 6.3.
+
+The eqv? procedure returns #f if one of the following holds:
+* obj1 and obj2 are of different types;
+* obj1 and obj2 are booleans for which the boolean=? procedure returns #f;
+* obj1 and obj2 are symbols for which the symbol=? procedure returns #f;
+* one of obj1 and obj2 is an exact number object but the other is an inexact number object;
+* obj1 and obj2 are rational number objects for which the = procedure return #f;
+* obj1 and obj2 yield different results when passed as arguments to any other procedure that can be defined as a finite composition of Scheme's standard arithmetic procedure;
+* obj1 and obj2 are characters for which the char=? procedure returns #f;
+* one of obj1 and obj2 is the empty list, but the other is not;
+* obj1 and obj2 are objects such as pairs, vectors, bytevectors, strings, records, ports, or hashtables that refer to distinct locations;
+* obj1 and obj2 are pairs, vectors, strings, or records, or hashtables, where the applying the same accessor (i.e. car, cdr, vector-ref, string-ref, or record accessors) to both yields results for which eqv? returns #f;
+* obj1 and obj2 are procedures that would behave differently (return different values or have different side effects) for some arguemnts;
+
+Note the eqv? procedure returning #t when obj1 and obj2 are number objects does not imply that = would also return #t.
+
+
+(eq? obj1 obj2), the eq? predicate is similar to eqv? except that in some cases it is capable of discerning distinctions finer than those detectable by eqv?. The eq? and eqv? predicates are guaranteed to have the same behavior on symbols, booleans, the empty list, pairs, procedures, non-empty strings, bytevectors, and vectors, and records. The behavior of eq? on number objects and characters is implementation-dependent, but it returns #t only when eqv? would also return #t.
+
+(equal? obj1 obj2), the equal? predicate returns #t if and only if the (possibly infinite) unfoldings of its arguments into regular trees are equal as ordered trees. The equal? predics treats pairs and vectors as nodes with outgoing edges, uses string=? to compare strings, uses bytevector=? to compare bytevectors, and uses eqv? to compare other nodes. Note that the equal? procedure must always terminate, even if its arguments contain cycles. 
+
+The standard **boolean** objects for true and false have external representations #t and #f. However, of all objects, only #f counts as false in conditional expressions. Note that programmers accustomed to other dialects of Lisp should be aware that Scheme distinguishes both #f and the empty list from each other and from the symbol nil. (not obj) return #t if obj is #f, and returns #f otherwise. (boolean? obj) returns #t if obj is either #t or #f and returns #f otherwise. (boolean=? bool1 bool2 bool3 ...) returns #t if the booleans are the same. 
+
+A **pair** is a compound structure with two fields called the car and cdr fields (for historical reasons). Pairs are created by the procedure cons. The car and cdr fields are accessed by the procedures car and cdr. Pairs are used primarily to represent lists. A list can be defined recursively as either the empty list or a pair whose cdr is a list. More precisely, the set of lists is defined as the samllest set X such that: the empty list is in X; if list is in X, then any pair whose cdr field contains list is also in X.
 
 
