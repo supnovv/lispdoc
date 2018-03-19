@@ -1,7 +1,7 @@
 
 ## atom?
 
-原子数据，非复合数据，非空表，即整数、字符串等基本数据。
+原子数据，不是列表。
 
     (define (atom? x)
       (and (not (pair? x)) (not (null? x))))
@@ -26,7 +26,7 @@
 
 ## list?
 
-列表，包含空表、以及原子数据组成的列表。
+列表，包含空表、以及非空列表。
 
     (list? '())    ;; #t
     (list? '(10))  ;; #t
@@ -72,7 +72,7 @@
     `(hotdog)`，因为 `(car l)` 是 `((hotdog))`，包含一个字符串的列表的列表。
 
 
-## cdr 仅用于非空列表，其结果为列表
+## cdr 仅用于非空列表，返回列表
 
     (cdr '(a b c))          ;; (b c)
     (cdr '((a b c) x y z))  ;; (x y z)
@@ -91,7 +91,7 @@
     错误，`a`不是列表。
 
 
-## cons 第二个参数必须是列表，其结果也是列表
+## cons 第二个参数必须是列表，返回列表
 
     (cons 'peanut '(butter jelly))          ;; (peanut buffer jelly)
     (cons '(banana and) '(butter jelly))    ;; ((banana and) butter jelly)
@@ -107,7 +107,7 @@
     错误，`'b` 不是列表。
 
 
-## eq? 对于比较符号和整数有确切的答案
+## eq? 对于符号和整数有确切答案
 
     (eq? 10 10)            ;; #t
     (eq? 10 20)            ;; #f
@@ -131,7 +131,7 @@
     真，因为 `'beans` 与 `'beans` 相等。
 
 
-## atomlist? 只能用列表作为参数
+## atomlist? 只能用列表作参数
 
     (atomlist? '(Jack Sprat could eat))    ;; #t
     (atomlist? '((Jack) Sprat))            ;; #f
