@@ -1,0 +1,27 @@
+
+Racket installed target directories are like below:
+
+  [e] Executables    /usr/local/bin (exists)
+  [o] Libraries      /usr/local/lib/racket (will be created)
+  [s] Shared files   /usr/local/share/racket (will be created)
+  [c] Configuration  /usr/local/etc/racket (will be created)
+  [d] Documentation  /usr/local/share/racket/doc (will be created)
+  [a] .desktop files /usr/local/share/applications (exists)
+  [m] Man Pages      /usr/local/share/man (exists)
+  [l] C Libraries    /usr/local/lib (exists)
+  [h] C headers      /usr/local/include/racket (will be created)
+
+Racket document (run raco docs can open local installed docs):
+
+  * Racket documentation (https://docs.racket-lang.org/)
+  * Racket quick introduction with pictures ($DOCS/quick/index.html)
+  * The Racket guide ($DOCS/guide/index.html)
+  * The Racket reference ($DOCS/reference/index.html)
+
+
+
+The Racket Reference
+--------------------
+by Matthew Flatt and PLT
+
+
