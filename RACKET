@@ -20,6 +20,78 @@ Racket document (run raco docs can open local installed docs):
 
 
 
+The Racket Quick Guide
+----------------------
+
+
+(define <name> <expr>)
+(define (<name> <args>) <body>)
+(define ((<name> <args-without-default-value>)
+         (<default-value-arg> <default-value>) ...) <body>)
+(define-values (<name> ...) (values <value> ...))
+
+    (define x 12)
+    x                                           -> 12
+    (define (g) 100)
+    (g)                                         -> 100
+    (define (f a b) (+ a b))
+    (f 1 2)                                     -> 3
+    (define-values (x y z) (values 1 2 3))
+    y                                           -> 2
+    z                                           -> 3
+    (define ((f a) (b 10) (c 20)) (+ a b c))
+    ((f 10))                                    -> 40
+    ((f 10) 20)                                 -> 50
+    ((f 10) 20 30)                              -> 60
+
+
+
+(let ((<name> <value>)
+      (<name> <value>)
+      ...)
+     <body>)
+(let <body-proc> ((<name> <value>)
+                  (<name> <value>)
+                  ...)
+                 <body>)
+(let* is like let, but <value> is evaluated and the <name>'s location is
+ created one by one from left to right, so the name of current value can
+ be used in next value expressions; about let, its <name>s location are
+ created only after all <value>s are evaluated)
+(letrec is like let, but all <name>s' location are created first, so all
+ <name>s can be referenced anywhere in the letrec, only if it is only
+ referenced not evaluated at the time, typically they are used in lambda
+ body, because they are not evaluated at the time lambda definition, only
+ evaluated when lambda is called later)
+(let-values (((<name> ...) (values <value> ...))
+             ((<name> ...) (values <value> ...))
+             ...)
+             <body>)
+(let*-values ...)
+(letrec-values ...)
+
+    (let ((x 1)
+          (y 2))
+         (+ x y))                                    -> 3
+    (let fac ((n 3))
+             (if (zero? n)
+                 1
+                 (* n (fac (- n 1)))))               -> 6
+    (let* ((x 1)
+           (y (+ x 2)))
+          (+ x y))                                   -> 4
+    (letrec ((even? (lambda (n) (or (zero? n) (odd? (- n 1)))))
+             (odd? (lambda (n) (not (even? n)))))
+            (odd? 11))                               -> #t
+    (let-values (((a b c) (values 1 2 3))
+                 ((x y) (quotient/remainder 10 3)))
+                (+ a b c x y))                       -> 10
+
+
+
+
+
+
 The Racket Reference
 --------------------
 by Matthew Flatt and PLT
