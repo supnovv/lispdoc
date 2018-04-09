@@ -59,14 +59,14 @@ The Racket Quick Guide
  be used in next value expressions; about let, its <name>s location are
  created only after all <value>s are evaluated)
 (letrec is like let, but all <name>s' location are created first, so all
- <name>s can be referenced anywhere in the letrec, only if it is only
- referenced not evaluated at the time, typically they are used in lambda
- body, because they are not evaluated at the time lambda definition, only
- evaluated when lambda is called later)
+ <name>s can be referenced anywhere in the letrec, only if they are referenced
+ not evaluated at the time, typically they are used in lambda body, because
+ they are not evaluated at the time lambda definition, only evaluated when
+ lambda is called later)
 (let-values (((<name> ...) (values <value> ...))
              ((<name> ...) (values <value> ...))
              ...)
-             <body>)
+            <body>)
 (let*-values ...)
 (letrec-values ...)
 
