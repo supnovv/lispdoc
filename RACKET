@@ -133,6 +133,46 @@ Racket 中的标识符，除了不能使用这些字符 ( ) [ ] { } " , ' ` ; # 
 
 
 
+ | Lists and Racket Syntax
+
+从 Racket 代码的呈现形式可以看出，Racket 代码别无其他，仅由列表和列表中的
+符号、常量组成。因为 Racket 数据是用列表表示的，程序也是用列表的形式书写
+的，除了最基本数据和程序（如常量 1、3.14、"hello"，程序 +、-、* 等），所有
+一切都是列表。从这个意义上，Racket 语法的解析简单看就是对列表的读取和处理
+过程，具体的分为两个阶段：
+
+  1. 读取阶段（the reader layer），将字符序列转化为列表以及其中的符号和常量
+  2. 展开阶段（the expander layer），将列表作为表达式进行处理
+
+由于程序就是用列表表达的，而列表是二元组的简化形式，因此如果用二元组的形
+式来表达程序也是可以的，例如 (+ 1 . (2)) 等价于 (+ 1 2) 。另外二元组表达形
+式还有一种特殊情况，就是两个点号可以用在列表中一个元素的两边，只要这个元
+素不是第一个也不是最后一个元素，就会触发 Racket 的一个读取规则，这个规则
+会将这个元素移动到该列表的开头，例如 (1 . < . 2) 等价于 (< 1 2) 。这种方式
+仅仅是为了方便在极少情况下（例如使用 < 和 is-a? 的时候）将前缀表达式写成
+中缀表达式（infix convention）。
+
+
+
+ | Quotes, Quasiquotes, Built-in Datatypes
+
+
+'(1 (+ 2 1) (+ 3 2))            => '(1 (+ 2 1) (+ 3 2))
+`(1 ,(+ 2 1) ,(+ 3 2))          => '(1 3 5)
+`(1 ,@(list (+ 2 1) (+ 3 2)))   => '(1 3 5)
+
+Quasiquotes or backquotes are same as quites, but will evaluate the expression
+prefixed by comma (,) or (,@) in the list first.
+
+PAIR:       '((1 . 2) . 3)
+LIST:       '(1 2 3)
+VECTOR:     '#(1 2 3)
+BOX:        '#&"apple"
+HASHTABLE:  '#hash(("apple" . red) ("banana" . yellow))
+
+
+
+
 The Racket Reference
 --------------------
 by Matthew Flatt and PLT
