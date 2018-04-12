@@ -363,7 +363,7 @@ with-syntax 以及 with-syntax*，使用它可以像使用 let 一样同时定�
          (with-syntax ((name (format-id stx "~a-~a" #'type #'field)))
            #'(define (name arg ...) body ...)))))
 
-看一个特殊的问题，我们如何简化下面这样形式的 if 语句的定义？特别地，如何
+看一个特殊的问题，我们如何通过宏简化下面这种形式的 if 表达式？ 特别地，如何
 正确定义其中的变量 it 。
 
     (let ((tmp-result (big-long-calculation)))
