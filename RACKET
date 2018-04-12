@@ -170,6 +170,303 @@ VECTOR:     '#(1 2 3)
 BOX:        '#&"apple"
 HASHTABLE:  '#hash(("apple" . red) ("banana" . yellow))
 
+一些函数会产生空值，例如 display 和 define，调用这些函数的后的返回结果是
+空的，Racket 提供了专门产生空值的函数 void，它可以接收任意多参数，产生出
+一个空值。
+
+(void)                -> print nothing
+(void 1 2 3)          -> print nothing
+(list (void))         -> '(#<void>) 一个包含空值的列表
+
+
+
+ | Macros
+
+Racket 的语法可以进行定制，这个定制手段就是宏，宏通过语法转换器将原来的
+语法转换成自己想要的语法。语法转换器其实就是一个简单的函数，只不过它接
+收的是一个语法对象，并对这个语法对象进行处理，输出一个新的语法对象。
+
+从另一个角度，宏其实是对 Racket 编译器的扩展。另外，racket/base 和 racket
+库中的许多语法形式也都是通过宏来实现对小型核心构造集的扩充的。(To put
+in another way, a macro is an extension to the Racket compiler. Most of the
+syntactic forms of racket/base and racket are actually macros that expand into
+a small set of core constructs.)
+
+下面定义了一个简单的转换函数，它忽略接收的语法对象，简单产生一个字符串：
+
+    (define-syntax foo
+      (lambda (stx) (syntax "I am foo")))
+
+跟函数定义一样，上面的定义可以简写，另外语法对象也有简写形式，
+(syntax "I am foo") 就与 #‘”I am foo" 等价 。但不论怎么简写这仍然是在定义
+一个语法转换函数，接收一个语法对象作为参数，返回新的语法对象作为结果。
+
+    (define-syntax (foo stx) #’"I am foo")
+    (foo)                                          -> "I am foo"
+
+那么什么是语法对象，从书面形式上，语法对象不过就是列表或像常量这样的基本
+表达式。而从内部实现的角度，语法对象是对列表进行解析后的结构化数据，它存
+储了该列表对应语法的全部信息。下面的转换函数打印语法对象的详细信息，返回
+一个空值语法对象。
+
+    (define-syntax (show-info stx)
+      (println stx)
+      (println (syntax-source stx))
+      (println (syntax-line stx))
+      (println (syntax-column stx))
+      #'(void))
+
+    (show-info (+ 1 2))          -> #<syntax:51:0 (show-info (+ 1 2))>
+                                    'readline-input
+                                    65
+                                    0
+
+有了语法对象，我们可以对它进行拆解和重新组装，生成新的语法对象。
+
+    (define stx #'(if x (+ y z) #f))
+    stx                          -> #<syntax:66:14 (if x (+ y z) #f)>
+    (syntax->datum stx)          -> '(if x (+ y z) #f)
+                                    语法对象转换成了符号列表，这个列表中的
+                                    第一个元素是符号 'if，第二个元素是符号
+                                    'x，第三个元素是另一个符号列表，第四个
+                                    元素是符号 #f
+
+    (define stx-list (syntax->list stx))
+    stx-list                     -> '(#<syntax:69:15 if>
+                                      #<syntax:69:18 x>
+                                      #<syntax:69:20 (+ y z)>
+                                      #<syntax:69:28 #f>)
+                                    将语法对象进行下一层次拆解，
+                                    形成一个语法对象列表
+
+    (define stx-obj (caddr stx-list))
+    (define stx-data (syntax->datum stx-obj))
+    stx-data                     -> '(+ y z)
+                                    提取语法对象列表中的一个对象，
+                                    然后将该语法对象转换成符号列表
+
+    (define new-stx-data `(,(first stx-data)
+                           (* ,(second stx-data) ,(second stx-data))
+                           ,(third stx-data)))
+    new-stx-data                 -> '(+ (* y y) z)
+    (define new-stx (datum->syntax stx-obj new-stx-data))
+    new-stx                      -> #<syntax (+ (* y y) z)>
+                                    对符号列表进行操作形成新的符号列表，
+                                    将新的符号列表转换成新的语法对象
+
+    (define-syntax (reverse-me stx)
+      (datum->syntax stx (reverse (cdr (syntax->datum stx)))))
+    (reverse-me "backwards" "am" "i" values)   -> "i"
+                                                  "am"
+                                                  "backwards"
+
+可以看出，syntax->datum 可以将语法对象转换成符号列表，然后符号列表可以当作
+数据执行任何数据操作生成新的符号列表，最后 datum->syntax 可以将新的符号列
+表转换成新的语法对象，即完成对 Racket 语法的定制。另外，函数 syntax->list
+可以对一个语法对象进行深层次拆解，生成一个语法对象列表，然后调用
+syntax->datum 可以对列表中的这些子语法对象进行更细化处理。
+
+对语法对象中的元素一个一个进行提取和操作是繁琐而且容易出错的，好的方式是
+直接对列表进行匹配：
+
+    (require (for-syntax racket/match))
+    (define-syntax (our-if-using-match stx)
+      (match (syntax->list stx)
+             ((list _ condition true-expr false-expr)
+              (datum->syntax stx `(cond (,condition ,true-expr)
+                                        (else ,false-expr))))))
+    (our-if-using-match #t "true" "false")    -> "true"
+    (our-if-using-match #f "true" "false")    -> "false"
+
+因为语法转换函数在编译时执行，如果要在编译时调用 match 函数，必须使用
+for-syntax 进入这个函数，如果直接 require，match 仅是一个运行时函数，在
+编译时是没有定义的，这将导致上面的转换函数报错。
+
+如果我们自己编写一个能够在编译时调用的普通函数，要怎么做呢？当然，第一
+种方法是像上面一样，将函数另外写到一个模块中，然后通过 for-syntax 引入。
+但如果我们想在同一个模块中定义这些函数怎么办呢，方法是使用 begin-for-syntax
+或者 define-for-syntax，例如下面的例子。其中 define-for-syntax 只是对
+begin-for-syntax 和 define 的一种简写，它只能一次定义一个函数。需要手动引入
+match 的原因是，Racket 默认只引入了 racket/base 模块到编译时。
+
+    (begin-for-syntax
+       (define (my-compile-time-func-1 ...) ...)
+       (define (my-compile-time-func-2 ...) ...))
+    (define-for-syntax (my-compile-time-func-3 ...) ...)
+    (define-for-syntax (my-compile-time-func-4 ...) ...)
+    (define-syntax (macro-using-compile-time-func stx) ...)
+
+匹配是有用的，因此 Racket 提供了更方便书写的方式 syntax-case，下面的对照
+写法可以清楚的看出 syntax-case 的版本简单了很多。
+
+    (require (for-syntax racket/match))
+    (define-syntax (our-if-using-match stx)
+      (match (syntax->list stx)
+             ((list _ condition true-expr false-expr)
+              (datum->syntax stx `(cond (,condition ,true-expr)
+                                        (else ,false-expr))))))
+
+    (define-syntax (our-if-using-match-v2 stx)
+      (syntax-case stx ()
+        ((_ condition true-expr false-expr)
+         #'(cond (condition true-expr) (else false-expr)))))
+
+    (define-syntax-rule (our-if-using-match-v3 condition true-expr false-expr)
+      (cond (condition true-expr) (else false-expr)))
+
+不需要使用反引号对变量求值了，也不需要使用 datum->syntax 对符号列表进行
+转换了。相反的，我们使用模板，直接使用匹配模式中的变量组成语法对象。
+而 define-syntax-rule 又是对 define-syntax 和 syntax-case 的一种简写，用来
+编写比较简单的语法转换函数。
+
+    (define-syntax (hyphen-func stx)
+      (syntax-case stx ()
+        ((_ type field (arg ...) body ...)
+         (let ((name (string->symbol (format "~a-~a" #'type #'field)))
+              #'(define (name arg ...) body ...))))))
+
+type field arg body 等都是匹配变量，匹配变量只能用在生成语法对象的模板中，
+即这些变量都只能用在 #' 表达式中，每个语法模板都生成一个语法对象。实际
+上，syntax-case 中可以有任意多的语法模板，只要保存最后一个表达式能够生成
+作为结果返回的语法对象。
+
+上面的语法转换函数，还存在一个问题是用在语法模板中的 name 不是一个匹配
+变量，在语法模板中只有匹配变量才会被求值。因为 name 不是匹配变量，不会
+被求值，上面的代码最终 define 的是一个名为 name 的函数，而不是 type-field。
+为解决这个问题，我们需要嵌套一个 syntax-case 。
+
+    (define-syntax (hyphen-func stx)
+      (syntax-case stx ()
+        ((_ type field (arg ...) body ...)
+         (syntax-case (datum->syntax stx (string->symbol (format "~a-~a" (syntax->datum #'type) (syntax->datum #'field)))) ()
+           (name #'(define (name arg ...) body ...))))))
+
+显然这很复杂，如果能简化一下就好了。恩，Racket 就是如此的贴心，它引入了
+with-syntax 以及 with-syntax*，使用它可以像使用 let 一样同时定义多个你想要
+的匹配变量。
+
+    (define-syntax (hyphen-func stx)
+      (syntax-case stx ()
+        ((_ type field (arg ...) body ...)
+         (with-syntax ((name (datum->syntax stx (string->symbol (format "~a-~a" (syntax->datum #'type) (syntax->datum #'field))))))
+           #'(define (name arg ...) body ...)))))
+
+另外，racket/syntax 库提供的 format-id 可以很方便的将标识符（identifier）
+转换成语法变量，省去将子语法对象转换成数据、组合成字符串、转换成符号、
+再转换成新的语法对象的过程，format-id 可以直接将子语法对象组合成新语法
+对象，下面的代码是不是清爽了很多。
+
+    (require (for-syntax racket/syntax))
+    (define-syntax (hyphen-func stx)
+      (syntax-case stx ()
+        ((_ type field (arg ...) body ...)
+         (with-syntax ((name (format-id stx "~a-~a" #'type #'field)))
+           #'(define (name arg ...) body ...)))))
+
+看一个特殊的问题，我们如何简化下面这样形式的 if 语句的定义？特别地，如何
+正确定义其中的变量 it 。
+
+    (let ((tmp-result (big-long-calculation)))
+      (if tmp (foo tmp) #f))
+
+    (anaphoric-if (big-long-calculation)
+                  (foo it)
+                  #f)
+
+    (define-syntax-rule (anaphoric-if condition true-expr false-expr)
+      (let ((it condition))
+           (if it true-expr false-expr)))
+
+    (anaphoric-if #t (displayln it) (void))   -> it: undefined
+
+怎么了，看起来定义也很简单，也没有错啊，为什么会报 it 没有定义的错误。
+实际上，语法转换函数中的变量也遵循着词法作用域规则。可以将函数想象成
+是一个函数对象，其中除了参数外，函数可以使用的变量都是对象的成员变量，
+函数对象的成员变量在函数定义时就初始化好了，而且这些成员变量由于是对象
+的内部变量，只能在函数内部使用。在调用函数时，是不可能引用这些变量的，
+这是上面代码中 it 变量没有定义的原因。
+
+但是，我们就是要实现上面那样的 it 变量的用法，怎么办？ Racket 中提供了
+parameter 和 parameterize 。
+
+    (define para-func (make-parameter "the default value for the parameter"))
+    (para-func)      -> "the default value for the parameter"
+    (parameterize ((para-func "the new value for the parameter"))
+      (para-func))   -> "the new value for the parameter"
+    (para-func)      -> "the default value for the parameter"
+
+    (require racket/stxparam)
+    (define-syntax-parameter it
+      (lambda (stx) (raise-syntax-error (syntax-e stx) "can only be used inside anaphoric-if")))
+    (define-syntax-rule (anaphoric-if condition true-expr false-expr)
+      (let ((tmp condition))
+        (if tmp (syntax-parameterize ((it (make-rename-transformer #'tmp))) true-expr)
+                false-expr)))
+    (anaphoric-if 10 (displayln it) (void))   -> 10
+
+接着我们看看 splicing-let，它可以很方便的为多个函数提供公共内部变量的访问。
+
+    (require racket/splicing)
+    (splicint-let ((x 0))
+      (define (get-x) x))
+    (get-x)   -> 0
+
+    (define get-y
+      (let ((y 0)) (lambda () y)))
+    (get-y)   -> 0
+
+    (require racket/splicing)
+    (splicing-let ((x 0))
+      (define (inc) (set! x (+ x 1)))
+      (define (dec) (set! x (- x 1)))
+      (define (get) x))
+
+    (define-values (inc dec get)
+      (let ((x 0)) (values (lambda () (set! x (+ 1 x)))
+                           (lambda () (set! x (- 1 x)))
+                           (lambda () x))))
+
+函数可能被错误的使用，宏也一样。对于函数的错误处理，第一种方式是完全不管，
+有调用者为错误负责，第二种在函数中编写错误处理代码，例如：
+
+    (define (misuse s)
+      (unless (string? s) (error 'misuse "expected a string, but got ~a" s))
+      (string-append s " snazzy suffix"))
+    (misuse 0)   -> miuse: expected a string, but got 0
+
+但不幸的是这种错误处理代码与函数真正的实现搅和在一起，让函数变得晦涩。第
+三种采用契约（contract）的方式则优雅得多。而第四种方式是使用 Typed Racket，
+它能在编译时就发现类型错误。
+
+    (define/contract (misuse s)
+      (string? . -> . string?)
+      (string-append s " snazzy suffix"))
+
+    (: misuse (String -> String))
+    (define (misuse s)
+      (string-append s " snazzy suffix"))
+
+宏的错误也有类似的处理方式，不过如果采用第一种和第二种方式，当错误发生时
+宏面临的情况将比函数更糟糕。因为宏的默认错误消息常常看上去没有什么道理，
+很难对错误进行跟踪；另外我们已经看到宏的实现比普通函数的实现是复杂很多，
+如果还在其中加入错误处理，实现宏代码将变得混乱不堪，更加晦涩难懂。因此
+Racket 提供了 syntax-parse 的方式，相当函数错误处理中的契约或类型系统方式
+来跟踪错误。
+
+syntax-parse 可以声明语法的匹配模式必须满足一定的规则，比如必须是一个标识
+符等。满足一定条件的一类语法称为一个语法类型，Racket 预定义了很多语法类
+性，我们也可以去定义我们自己的语法类型。
+
+    (require (for-syntax syntax/parse))
+    (begin-for-syntax
+      (define-syntax-class foo (pattern (a b c))))
+    (define-syntax (stxfunc stx)
+      (syntax-parse stx
+       ((_ f:foo) #'(+ f.a f.b f.c))))
+
+
+ ** 再来重新看待宏 **
+
 
 
 
