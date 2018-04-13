@@ -467,6 +467,59 @@ syntax-parse 可以声明语法的匹配模式必须满足一定的规则，比�
 
  ** 再来重新看待宏 **
 
+    (define-syntax (name stx) body)
+    (syntax-rules (literal-identifier ...)
+      (pattern template))
+    (syntax-case stx (literal-identifier ...)
+      clause ...)
+    clause = (pattern result-stx-expr)
+           | (pattern fender result-stx-expr)
+
+    (define-syntax-rule (swap x y)
+      (let ((tmp x)) (set! x y) (set! y tmp)))
+
+    (define-syntax swap
+      (syntax-rules ()
+        ((_ x y) (let ((tmp x)) (set! x y) (set! y tmp)))))
+
+    (define-syntax (swap stx)
+      (syntax-case stx ()
+        ((_ x y) #'(let ((tmp x)) (set! x y) (set! y tmp)))))
+
+
+    ;; identifier macros
+
+    (define-syntax (val stx)
+      (syntax-case stx ()
+        (val (identifier? #'val) #'(get-val))))
+
+    (define-values (get-val put-val!)
+      (let ((local-val 0))
+           (values (lambda () local-val)
+                   (lambda (v) (set! local-val v)))))
+
+    (require racket/splicing)
+    (splicing-let ((local-val 0))
+      (define (get-val) local-val)
+      (define (put-val! v) (set! local-val v)))
+
+    val             -> 0
+    (+ val 3)       -> 3
+    (put-val! 10)
+    val             -> 10
+
+    ;; set! transformers
+
+    (define-syntax val
+      (make-set!-transformer
+        (lambda (stx)
+          (syntax-case stx (set!)
+            (val (identifier? #'val) #'(get-val))
+            ((set! val new-val) #'(put-val! new-val))))))
+
+    val            -> 10
+    (set! val 3)
+    val            -> 3
 
 
 
