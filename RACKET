@@ -23,33 +23,245 @@ Racket document (run raco docs can open local installed docs):
 The Racket Quick Guide
 ----------------------
 
-Racket 中的标识符，除了不能使用这些字符 ( ) [ ] { } " , ' ` ; # | \ 以及对
-应的字符序列表示的不是一个数字外，可以是由任何非空白字符组成的字符序列。
+
+Racket's reader is a recursive-descent parser that can be configured through
+a readtable and various other parameters. This section describes the reader's
+parsing when using the default readtable. The reader can be invoked in either
+of two modes: read mode, or read-syntax mode.
+
+Symbols, keywords, strings, byte strings, regexps, characters, and numbers
+produced by the reader in read-syntax mode are interned, which means that
+such values in the result of read-syntax are alwasy eq? when they are equal?.
+Symbols and keywords are interned in both read and read-syntax mode.
+
+Racket 读取器可以工作在 read 或 read-syntax 模式，read 模式返回具体的值，
+而 read-syntax 则返回语法对象。上面 Interned 的含义是，如果一个类型是
+Interned 的，则表示该类型的两个值如果相等，俺么这两个值一定指向同一个
+对象。其中对于值的比较， eq? 仅比较是否为同一个对象，eqv? 还会在不是同
+一个对象的基础上再比较整数和字符的具体的值，而 equal? 还要比 eqv? 比较
+得更多。
+
+Racket 规范中的语法表示，例如 (something [id ...+] an-expr ...) 的含义是
+something 这个结构有一个或多个 id（即标识符），零个或多个表达式。
+
+    ;; symbols
+
+    符号和符号列表是数据，标识符（表示变量或函数）和语法表达式是程序，但
+    这两者的呈现形式（textual representation）几乎是一样的，只差一个引号。
+    LISP 的表达式被称为符号表达式（s-expr, symbol expression），就是因为其
+    表达式在形式上就是一个符号列表。LISP 的这种性质，使得 LISP 可以优雅地
+    将程序当作数据来处理，将数据当作程序来执行。
+
+    具体的，eval 可以将符号或符号列表的引号去掉当作程序执行，引号或 quote
+    可以将标识符或语法表达式转换成符号或符号列表当做数据处理。
+
+    (define (f a b) (+ a b))
+    (define a 10)
+    (define b 20)
+    (f a b)                             -> 30
+    (define symbol-list '(f a b))
+    (eval symbol-list)                  -> 30
+    (first symbol-list)                 -> 'f
+    (second symbol-list)                -> 'a
+    (third symbol-list)                 -> 'b
+
+    更粗暴地，宏在编译时就可以将语法表达式转换成符号列表（通过调用编译时
+    函数 syntax->datum），然后可以对符号列表进行拆解、拼装、替换等能想到的
+    操作得到新的符号列表，最后通过编译时函数 datum->syntax 生成新的语法表
+    达式。
+
+    (define-syntax (transform stx)
+      (let* ((sym-list (cadr (syntax->datum stx)))
+             (new-list `(,(car sym-list) (* ,(cadr sym-list) ,(caddr sym-list)) 0)))
+            (datum->syntax stx new-list)))
+    (f a b)                        -> 30
+    (transform (f a b))            -> 200
+                                      这里相当于在编译时将 (f a b)
+                                      修改成了 (f (* a b) 0)
+
+    而 syntax-case 可以简化宏的编写：
+
+    (define-syntax (transform stx)
+      (syntax-case stx ()
+        ((_ (f a b)) #'(f (* a b) 0))))
+    (trasform (f 10 20))           -> 200
+
+    再回到对符号的讨论，符号是对标识符的引用，其内部表示可以看成保存的
+    其实就是一个字符串，这个字符串是标识符的名称，只要名称相同两个符号
+    内部指向的都是同一个字符串对象。
+
+    (define syma 'abc)
+    (define symb 'abc)
+    (define symc 'Abc)
+    (eq? syma symb)    -> #t
+                          因为 syma 和 symb 在内部指向同一个对象
+    (eq? syma symc)    -> #f
+
+    Racket 标识符名称的一般限制是，它表示的不能是一个数字，也不能包含空白
+    字符以及这些特殊字符 ( ) [ ] { } " , ' ` ; # | \ 。对于 # 字符，它只不允
+    许出现在标识符开头，另外单独的点号（.）不是一个表示符。其实，通过将字
+    符序列包含在两个 | 或 \ 字符之间，Racket 标识符几乎可以包含任意字符。
+
+    (define-values (|(f a b)| |3.14, 2|) (values (f a b) 6.28))
+    |(f a b)|                      -> 30
+    |3.14, 2|                      -> 6.28
+    (write '|(f a b)|)             -> |(f a b)|
+    (display '|(f a b)|)           -> (f a b)
+
+    另外使用 gensym 或 string->uninterned-symbol 可以生成一个全新的符号，
+    这个符号跟任何已经产生的符号都不相同，即使它们的名字一样。(The gensym
+    and string->uninterned-symbol procedures generate fresh uninterned symbols
+    that are not eq? to any previously interned or uninterned symbol. Uninterned
+    symbols are useful as fresh tags that cannot be confused with any other
+    value.)
+
+    (define s (gensym))
+    s                                          -> 'g119
+    (eq? s 'g119)                              -> #f
+    (eq? 'a (string->uninterned-symbol "a"))   -> #f
+
+
+    ;; keywords
+
+    关键字不能用作标识符，它自己就不是一个合法的表达式，但可以通过引用
+    形成一个表达式，得到这个关键字对应的符号（symbol）。更准确的，关键
+    字类似于标识符，是一类有特殊含义不能当作一般标识符使用的标识符。因
+    而关键字的引用就容易理解了，它就相当是一个标识符的引用，标识符的引
+    用就是一个符号。
+
+    #:apple  -> readline-input:215:0: #%datum: keyword used as an expression
+    '#:apple                     -> '#:apple
+    (string->keyword "apple")    -> '#:apple
+    (display '#:apple)           ->  #:apple
+    (string->keyword "an apple") -> '#:|an apple|
+    (write '#:|an apple|)        ->  #:|an apple|
+    (display '#:|an apple|)      ->  #:an apple
+
+    关键字的一个用途是，为函数定义可选的命名参数，即这个参数在函数调用时
+    可以不提供（此时使用默认值），也可以用命名方式提供（使用传入的值）。
+
+    (define (f a b (c 3) #:d (d 4) #:e (named-e 5)) (+ a b c d named-e))
+    (f 1 2)                                     -> 15
+    (f 1 2 4)                                   -> 16
+    (f 1 2 #:d 5)                               -> 16
+    (f 1 2 #:e 6)                               -> 16
+    (f #:d 5 1 #:e 6 2)                         -> 17
+    (define (f a b (c 3) #:d d) (+ a b c d))
+    (f 1 2)                                     -> application: required keyword argument not supplied
+    (f 1 2 #:d 5)                               -> 11
+    (f 1 2 4 #:d 5)                             -> 12
+
+    由于关键字本身不是一个表达式，因此每个关键字后面必须跟随一个表达式。
+    对于关键字参数的定义，关键字后面必须跟随一个形参名，或者形参名和默认
+    值；对于函数调用时的命名实参的传递，关键字后面必须跟随对应的实参。
+
+    关键字另外的用途是用在一些特殊的语法形式中。而对与运行时的标记或枚举
+    值，一般用符号表示。
+
+
+    ;; void and undefined
+
+    一些函数会产生空值，例如 display 和 define，调用这些函数的后的返回结果
+    是空的，Racket 提供了专门产生空值的函数 void，它可以接收任意多参数，产
+    生出一个空值。
+
+    (void)                -> print nothing
+    (void 1 2 3)          -> print nothing
+    (list (void))         -> '(#<void>)
+                             一个包含空值的列表
+
+
+    ;; quotes and backquotes
+
+    '(1 (+ 2 1) (+ 3 2))            => '(1 (+ 2 1) (+ 3 2))
+    `(1 ,(+ 2 1) ,(+ 3 2))          => '(1 3 5)
+    `(1 ,@(list (+ 2 1) (+ 3 2)))   => '(1 3 5)
+
+    Quasiquotes or backquotes are same as quites, but will evaluate the
+    expression prefixed by comma (,) or (,@) in the list first.
+
+    PAIR:       '((1 . 2) . 3)
+    LIST:       '(1 2 3)
+    VECTOR:     '#(1 2 3)
+    BOX:        '#&"apple"
+    HASHTABLE:  '#hash(("apple" . red) ("banana" . yellow))
+
+
+    ;; syntax objects
+
+    一个语法对象包含对应语法表达式的符号列表、源代码位置信息、词法绑定
+    信息。例如表达式 (+ 1 2) 对应的语法对象，其符号列表包含 '+ '1 '2 三个
+    符号，源代码位置信息包含该表达式在源代码中的行数和列数等信息常用来
+    提示发生语法错误的代码位置，而词法绑定信息让宏能够维护其词法作用域
+    规则。
+
+    只有一个符号（不是常量符号）的语法对象称为标识符语法对象（identifier
+    syntax object），通过函数 identifier? 来判断，而 free-identifier=? 可以
+    判断两个标识符语法对象对象的标识符是否执行同一个对象，如果是返回真。
+
+    (identifier? #'car)                    -> #t
+    (identifier? #'abc)                    -> #t
+    (identifier? #'123)                    -> #f
+    (identifier? #'(+ 1 2))                -> #f
+    (free-identifier=? #'car #'cdr)        -> #f
+    (free-identifier=? #'car #'car)        -> #t
+    (require (only-in reacket/base (car also-car)))
+    (free-identifier=? #'car #'also-car)   -> #t
+
 
 
  | Definitions and Local Bindings
 
 
 (define <name> <expr>)
-(define (<name> <args>) <body>)
-(define ((<name> <args-without-default-value>)
-         (<default-value-arg> <default-value>) ...) <body>)
 (define-values (<name> ...) (values <value> ...))
+(define (<name> <args> . <rest>) <body>)
+(define (<name> <arg> ...) <body>)
+<arg> = <positioned-no-default-value-arg>
+      | (<positioned-has-default-value-arg> <default-value>)
+      | <named-keyword-arg> <keyword-arg-name>
+      | <named-keyword-arg> (<keyword-arg-name> <default-value>)
+(define ((<name> <args-without-default-value>)
+         <arg-can-have-default-value>
+         ...) <body>)
+<arg-can-have-default-value> = <arg-has-no-default-value>
+                             | (<arg-has-default-value> <default-value>)
 
     (define x 12)
     x                                           -> 12
+    (define-values (x y z) (values 1 2 3))
+    y                                           -> 2
+    z                                           -> 3
+
     (define (g) 100)
     (g)                                         -> 100
     (define (f a b) (+ a b))
     (f 1 2)                                     -> 3
-    (define-values (x y z) (values 1 2 3))
-    y                                           -> 2
-    z                                           -> 3
+
+    (define (f . args) (/ (apply + args) (length args)))
+    (f 1 2 3)                                   -> 2
+    (define (f n . args) (/ (apply + args) n))
+    (f 3 1 2 3)                                 -> 2
+
+    (define (f a b (c 3) #:d (d 4) #:e (named-e 5)) (+ a b c d named-e))
+    (f 1 2)                                     -> 15
+    (f 1 2 4)                                   -> 16
+    (f 1 2 #:d 5)                               -> 16
+    (f 1 2 #:e 6)                               -> 16
+    (f #:d 5 1 #:e 6 2)                         -> 17
+    (define (f a b (c 3) #:d d) (+ a b c d))
+    (f 1 2)                                     -> application: required keyword argument not supplied
+    (f 1 2 #:d 5)                               -> 11
+    (f 1 2 4 #:d 5)                             -> 12
+
     (define ((f a) (b 10) (c 20)) (+ a b c))
     ((f 10))                                    -> 40
     ((f 10) 20)                                 -> 50
     ((f 10) 20 30)                              -> 60
-
+    (define ((g a) b (c 20)) (+ a b c))
+    ((g 10))                                    -> the expected number of arguments does not match the given number
+    ((g 10) 20)                                 -> 50
+    ((g 10) 20 30)                              -> 60
 
 (let ((<name> <value>)
       (<name> <value>)
@@ -151,33 +363,6 @@ Racket 中的标识符，除了不能使用这些字符 ( ) [ ] { } " , ' ` ; # 
 会将这个元素移动到该列表的开头，例如 (1 . < . 2) 等价于 (< 1 2) 。这种方式
 仅仅是为了方便在极少情况下（例如使用 < 和 is-a? 的时候）将前缀表达式写成
 中缀表达式（infix convention）。
-
-
-
- | Quotes, Quasiquotes, Built-in Datatypes
-
-
-'(1 (+ 2 1) (+ 3 2))            => '(1 (+ 2 1) (+ 3 2))
-`(1 ,(+ 2 1) ,(+ 3 2))          => '(1 3 5)
-`(1 ,@(list (+ 2 1) (+ 3 2)))   => '(1 3 5)
-
-Quasiquotes or backquotes are same as quites, but will evaluate the expression
-prefixed by comma (,) or (,@) in the list first.
-
-PAIR:       '((1 . 2) . 3)
-LIST:       '(1 2 3)
-VECTOR:     '#(1 2 3)
-BOX:        '#&"apple"
-HASHTABLE:  '#hash(("apple" . red) ("banana" . yellow))
-
-一些函数会产生空值，例如 display 和 define，调用这些函数的后的返回结果是
-空的，Racket 提供了专门产生空值的函数 void，它可以接收任意多参数，产生出
-一个空值。
-
-(void)                -> print nothing
-(void 1 2 3)          -> print nothing
-(list (void))         -> '(#<void>) 一个包含空值的列表
-
 
 
  | Macros
@@ -479,7 +664,7 @@ syntax-parse 可以声明语法的匹配模式必须满足一定的规则，比�
       (let ((tmp x)) (set! x y) (set! y tmp)))
 
     (define-syntax swap
-      (syntax-rules ()
+      (syntax-rules ()   ;; syntax-rules returns a transformer function
         ((_ x y) (let ((tmp x)) (set! x y) (set! y tmp)))))
 
     (define-syntax (swap stx)
