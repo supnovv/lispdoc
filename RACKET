@@ -708,8 +708,42 @@ syntax-parse 可以声明语法的匹配模式必须满足一定的规则，比�
 
 
 
-The Racket Reference
---------------------
-by Matthew Flatt and PLT
+Macro Example: HTML TEMPLATE
+----------------------------
 
+(define-syntax (write-tag stx)
+  (print-tag (syntax->datum stx))
+  #'(void))
+
+(define (print-tag s-list)
+  (cond ((or (null? s-list) (not (list? s-list))) (void))
+        (else (define (name (car s-list)))
+              (define (rest (cdr s-list)))
+              (cond ((self-close-tag? name) (print-out "<")
+                                            (print-tag-name name)
+                                            (print-tag-attr name rest)
+                                            (print-out ">"))
+                    ((empty-content-tag? name) (print-out "<")
+                                               (print-tag-name name)
+                                               (print-tag-attr name rest)
+                                               (print-out "></")
+                                               (print-tag-name name)
+                                               (print-out ">"))
+                   (else (print-out "<")
+                         (print-tag-name name)
+                         (cond ((null? rest) (print-out "></") (print-tag-name name) (print-out ">"))
+                               (else (define attr (car rest))
+                                     (define content (cdr rest))
+                                     (if (and (list? attr) (not (null? attr)) (eqv? #@ (car attr)))
+                                         (begin (print-tag-attr name attr)
+                                                (print-out ">")
+                                                (print-tag-content name content)
+                                                (print-out "</")
+                                                (print-tag-name name)
+                                                (print-out ">"))
+                                         (begin (print-out ">")
+                                                (print-tag-content name rest)
+                                                (print-out "</")
+                                                (print-tag-name name)
+                                                (print-out ">"))))))))))
 
