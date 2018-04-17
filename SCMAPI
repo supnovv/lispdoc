@@ -1,0 +1,60 @@
+
+    ;; string port
+
+    (open-output-string)   ;; return a new string output port
+
+    A string output port is similar to a file output port, except that
+    characters and objects written to the port are placed in a string (which
+    grows as needed) rather than to a file. It is not necessary to close a
+    string port, although it is okay to do so.
+
+    (get-output-string string-output-port)  ;; return the associated string
+
+    As a side effect, get-output-string resets string-output-port so that
+    subsequent output to string-output-string is placed into a fresh string.
+
+    (with-output-to-string zero-arg-func)   ;; return a string
+
+    This function calls the zero-arg-func, and redirect its current output
+    port to a new string output port, and then returned the result string.
+
+    ;; port operations
+
+    (block-write port s)
+    (block-write port s n)
+    (clear-output-port port)
+    (close-port port)
+    (port-output-index port)  ;; current position index
+    (port-output-size port)   ;; port current buffer size
+    (port-output-count port)  ;; current available buffer size (size - index)
+    (write s [port])
+    (write-char c [port])
+    (display s [port])
+    (newline [port])
+
+    The default port is current-output-port, its initial value is the same
+    port as the initial value of console-output-port. Other pre-defined ports
+    are including console-error-port, current-error-port.
+
+(define-syntax (html-template stx)
+  (syntax-case stx ()
+    ((
+
+    (html (@ (lang "zh-CN"))
+      (head
+        (meta (@ (charset "utf-8")))
+        (meta (@ (http-equiv "X-UA-Compatible") (content "IE=Edge")))
+        (title (% page-title))
+        (%style)
+        (%script)
+      (%body)))))
+
+(html-template
+  title "the page new title"
+  lang.en        ;; the value prefix by the dot is a pre-defined value
+  charset.utf8
+  style (tag-stx-1 tag-stx-2)
+  script (tag-stx)
+  body body-stx)
+
+
