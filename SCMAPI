@@ -11,8 +11,114 @@ References
     'expr is equivalent to (quote expr), the abbreviated form is converted into
     the longer form by the Scheme reader. Quote inhibits the normal evaluation
     rule for expr, allowing expr to be employed as data. Although any Scheme
-    object may be quoted, quotation is not neccessary for self-evaluating
-    constants, i.e., booleas, characters, numbers, strings, and bytevectors.
+    object may be quoted, quotation is not neccessary for self-evaluated
+    constants, i.e., booleans, numbers, characters, strings, or bytevectors.
+    Quoted and self-evaluating constants are immutable (it is true in Racket,
+    but ChezScheme can modify string and bytevector constants).
+
+    The objects that need not to quoted, there are constants and self-evaluated:
+
+    #t
+    #f
+    #b1100            ;; 12
+    3.14
+    100
+    1/2
+    #\A
+    #\linefeed
+    "abc"
+    "abc\n"
+    #vu8(1 2 3)
+    #vu8(#xFE #xFF)   ;; #vu8(254 255)
+
+    Lists, pairs and vectors have their abbreviation form by using quotes:
+
+    '()                 ;; (list), a empty list
+    '(1 2 3)            ;; (list 1 2 3), a number list
+    '(a b c)            ;; (list 'a 'b 'c), a symbol list
+    `(,a ,b ,c)         ;; (list a b c), a list has three values
+    '#()                ;; (vector), a empty vector
+    '#(1 2 3)           ;; (vector 1 2 3), a number vector
+    '#(a b c)           ;; (vector 'a 'b 'c), a symbol vector
+    `#(,a ,b ,c)        ;; (vector a b c), a vector has three values
+
+    (list? '())         ;; #t
+    (list? '(1 2 3))    ;; #t
+    (vector? '#())      ;; #t
+    (vector? '#(1 2 3)) ;; #t
+    (symbol? #t)        ;; #f
+    (symbol? 12)        ;; #f
+    (symbol? #\a)       ;; #f
+    (symbol? "abc")     ;; #f
+    (symbol? #vu8())    ;; #f
+    (symbol? 'abc)      ;; #t
+
+
+    ;; booleans
+
+    While every Scheme object has a truth value when used in a conditional
+    context, whith every object but #f counting as true, Scheme provide the
+    dedicated true value #t for use.
+
+    (boolean=? b1 b2)  ;; eq? is typically more efficient than boolean=?
+
+    ;; numbers
+
+    Scheme numbers may be classified as integers, rational numbers, real
+    numbers, or complex numbers. A Scheme number may also be classified as
+    exact or inexact, depending upon the quality of operations used to derive
+    the number and the inputs to these operatons.
+
+    3
+    +19
+    -100000
+    208423089237489374
+    3/4
+    -6/5
+    1/1208203823
+    1.0
+    -200.00
+    1.5
+    0.034
+    -10e-10
+    1.5e-5
+    2e3
+    3+4i
+    3.2-3/4i
+    +i
+    -3e-5i     ;; rectangular form complex
+    1.1@1.764  ;; polar form complex
+    -1@-1/2
+    +inf.0     ;; positive infinity
+    -inf.0     ;; negative infinity
+    +nan.0     ;; not-a-number
+    -nan.0     ;; not-a-number
+    #b10101
+    #o72
+    #d100
+    #xC7
+
+
+    ;; symbols
+
+    Symbols are used for a variety of purpose as symbolic names in Scheme.
+    Strings could be used for most of the same purposes, but an important
+    characteristic of symbols makes comparisons between symbols much more
+    efficient. This characteristic is that two symbols with the same name
+    are identical in these sense of eq?. The reason is that the Scheme reader
+    (invoked by get-datum and read) and the procedure string->symbol catalog
+    symbols in an internal symbol table and always return the same symbol
+    whether the same name is encountered. It makes symbols ideally suited for
+    use as identifiers in the representation of programs, allowing fast
+    comparison of idnetifiers. This property also makes symbols useful for
+    a variety of other purpose. For example, symbols might be used as messages
+    passed between procedures, lables for list-structured records, or names
+    for objects stored in an association list.
+
+    (symbol=? s1 s2)    ;; eq? is typically more efficient than symbol=?
+    (string->symbol s)
+    (symbol->string s)
+
 
     ;; characters
 
@@ -141,7 +247,8 @@ References
     modify an immutable string causes an exception to be raised.
 
 
-    ;; symbols
+    ;; lists and pairs
+
 
     ;; vectors
 
@@ -162,10 +269,10 @@ References
     of object.
 
     #(1 2 3)               ;; invalid syntax, should use '#(1 2 3)
-    (vector)               ;; abbr. form '#(), a empty vector
-    (vector 1 2 3)         ;; abbr. form '#(1 2 3), a number vector
-    (vector 'a 'b 'c)      ;; abbr. form '#(a b c), a symbol vector
-    (vector a b c)         ;; abbr. from `#(,a ,b ,c), a vector has three values
+    (vector)               ;; abbr. form is '#(), a empty vector
+    (vector 1 2 3)         ;; abbr. form is '#(1 2 3), a number vector
+    (vector 'a 'b 'c)      ;; abbr. form is '#(a b c), a symbol vector
+    (vector a b c)         ;; abbr. from is `#(,a ,b ,c), a vector has three values
     (vector? (vector))     ;; #t
     (vector? '#())         ;; #t
     (make-vector 0)        ;; '#()
@@ -331,6 +438,14 @@ References
     (eq/symbol-hashtable-contains? h key)
     (eq/symbol-hashtable-cell h key default)
     (eq/symbol-hashtable-delete! h key)
+
+    (define h (make-hashtable symbol-hash eq? 32))
+    (symbol-hashtable? h)                           ;; #t
+    (symbol-hashtable-set! h 'key-a "string")
+    (symbol-hashtable-set! h 'key-b 3.14)
+    (symbol-hashtable-ref h 'key-a "unknown")       ;; "string"
+    (symbol-hashtable-ref h 'key-b "unknown")       ;; 3.14
+    (symbol-hashtable-ref h 'key-x "unknown")       ;; "unknown"
 
 
     ;; string port
