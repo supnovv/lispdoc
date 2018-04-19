@@ -1,4 +1,338 @@
 
+References
+
+[1] The Revised6 Report on the Algorithmic Language Scheme (http://www.r6rs.org/)
+[1] The Scheme Programming Language 4th Edition (https://www.scheme.com/tspl4/)
+[2] ChezScheme Version 9 User's Guide (http://cisco.github.io/ChezScheme/csug9.5/csug.html)
+
+
+    ;; quotes
+
+    'expr is equivalent to (quote expr), the abbreviated form is converted into
+    the longer form by the Scheme reader. Quote inhibits the normal evaluation
+    rule for expr, allowing expr to be employed as data. Although any Scheme
+    object may be quoted, quotation is not neccessary for self-evaluating
+    constants, i.e., booleas, characters, numbers, strings, and bytevectors.
+
+    ;; characters
+
+    Characters are objects that represent Unicode scalar values. Not: Unicode
+    defines a standard mapping between sequences of Unicode scalar values
+    (integers in the range 0 to #x10FFFF, excluding the range #xD800 to #xDFFF)
+    in the latest version of the standard and human-readable "characters".
+    More precisely, Unicode distinguishes between glyphs, which are printed for
+    humans to read, and characters, which are abstract entities that map to
+    glyphs (sometimes in a way that's sensitive to surrounding chracters).
+    Furthermore, different sequences of scalar values sometimes correspond to
+    the same character. The relationships among scalar, characters, and glyphs
+    are subtle and complex. Despite this complexity, most things that a
+    literate human would call a "character" can be represented by a single
+    Unicode salar value. For example, Roman letters, Cyrillic letters, Hebrew
+    consonants, and most Chinese characters fall into this category.
+    Unicode scalar values exclude the range #xD800 to #xDFFF, which are part
+    of the range of Unicode code points. However, the Unicode code points in
+    this range, the so-called surrogates, are an artifact of the UTF-16
+    encoding, and can only appear in specific Unicode encodings, and even then
+    only in pairs that encode scalar values. Consequently, all characters
+    represent code points, but the surrogate code points do not have
+    representations as characters.
+
+    -- TSPL --
+
+    #\A                 ;; character A
+    #\x                 ;; character x
+    #\(                 ;; character (
+    #\nul               ;; U+0000
+    #\alarm             ;; U+0007
+    #\backspace         ;; U+0008
+    #\tab               ;; U+0009
+    #\newline           ;; U+000A, it is deprecated, use #\linefeed instead
+    #\linefeed          ;; U+000A
+    #\vtab              ;; U+000B
+    #\page              ;; U+000C
+    #\return            ;; U+000D
+    #\esc               ;; U+001B
+    #\space             ;; U+0020, preferred way to write a space
+    #\delete            ;; U+007F
+    #\xFF               ;; U+00FF
+    #\x03BB             ;; U+03BB
+    #\x00006587         ;; U+6587
+    (char? c)
+    (char->integer c)
+    (integer->char i)     ;; i must be a Unicode scalar value, i.e., a non-negative exact integer in [0, #xD7FF] and [#xE000, #x10FFFF]
+    (char=? c1 c2 ...)
+    (char<? c1 c2 ...)
+    (char-ci=? c1 c2 ...) ;; case insensitive version
+    (char-ci<? c1 c2 ...) ;; case insensitive version
+    (char-alphabetic? c)  ;; it is a letter or not
+    (char-numeric? c)     ;; it is a digit or not
+    (char-whitespace? c)  ;; it is whitespace or not
+    (char-lower-case? c)
+    (char-upper-case? c)
+    (char-general-category c)  ;; return a symbol representing the Unicode general category of the character
+    (char-upcase c) -> char    ;; it is one of the symbol Lu/l/t/m/o, Mn/c/e, Nd/l/o, Ps/e/i/f/d/c/o, Sc/m/k/o, Zs/p/l, Cc/f/s/o/n
+    (char-downcase c) -> char
+
+
+    ;; strings
+
+    Strings are sequences of characters. The length of a string is the number
+    of characters that it contains. This number is fixed when the string is
+    created. The valid indices of a string are the integers less than the
+    length of the string. The first character of a string has index 0.
+
+    -- TSPL --
+
+    Strings are sequences of characters and are often used as messages,
+    character buffers, or containers for blocks of text. Scheme provides
+    operations for creating strings, extracting characters from strings,
+    obtaining substrings, concatenating strings, and altering the contents
+    of strings. A string is written as a sequence of characters enclosed in
+    double quotes, e.g., "hi there". Various special characters can be inserted
+    with two-character sequences, e.g., \\ \" \a \b \f \v \n \r \t. Any Unicode
+    character may be inserted with the syntax #\xn; where n consists of one or
+    more hexadecimal digits and represents a valid Unicode scalar value.
+    A string can occupy multiple lines. A line ending that does not follow a
+    backslash stands for a linefeed (\n, U+000A) character. Strings are indexed
+    by exact nonnegative integers, and the index of the 1st element of any
+    string is 0. The highest valid index for a given string is on less than
+    its length.
+
+    (string)                    ;; ""
+    (string #\a #\b #\c)        ;; "abc"
+    (make-string 0)             ;; ""
+    (make-string 2)             ;; the elements are unspecified, but "\x0;\x0;" in ChezScheme and "\u0000\u0000" in Racket
+    (string-length "\x20;")     ;; 1 in ChezScheme, 2 in Racket because Racket has a different representation for Unicode character
+    (string-ref "Abc" 0)        ;; #\A
+    (string-ref "Abc" 1)        ;; #\b
+    (string-set! s index c)
+    (string-full! s c)
+    (string-copy s) -> string
+    (string-append s1 s2 ...) -> string   ;; concatenate s1, s2, ...
+    (substring "abc" 0 1)       ;; "a"
+    (substring "abc" 0 2)       ;; "ab"
+    (string-upcase s)
+    (string-downcase s)
+    (string-titlecase s)        ;; the word's first character becomes upcase and other characters become lowercase
+    (string->list s)
+    (list->string l)
+    (string=? s1 s2 s3 ...)
+    (string<? s1 s2 s3 ...)
+    (string-ci=? s1 s2 s3 ...)  ;; case insensitive version
+    (string-ci<? s1 s2 s3 ...)
+
+    (define s "abc")
+    (string-fill! s #\A)        ;; contract violation in Racket because string constant is immutable, but okey in ChezScheme
+    s                           ;; "AAA"
+    (define s (string #\a #\b #\c))
+    (string-fill! s #\A)        ;; both okey in Racket and ChezScheme
+    s                           ;; "AAA"
+    "abc 
+     fgh"                       ;; "abc \n fgh"
+    "abc\
+       fgh"                     ;; "abcfgh", but "abc  fgh" in Racket
+    "abc\                       ;; there are whitespaces after backslash
+            fgh"                ;; "abcfgh", but invalid in Racket, there is an unknown escape sequence \ in string
+
+    -- ChezScheme --
+
+    All strings are mutable by default, including constants. A program can
+    create immutable strings via string->immutable-string. Any attempt to
+    modify an immutable string causes an exception to be raised.
+
+
+    ;; symbols
+
+    ;; vectors
+
+    The length of a vector is the number of elements that it contains. This
+    number is a non-negative integer that is fixed when the vector is created.
+    Like list constants, vector constants must be quoted: '#(0 (1 2 3) "Anna").
+
+    -- TSPL --
+
+    Vectors are more convenient and efficient than lists for some applications.
+    Wheras accessing an arbitrary element in a list requires a linear traversal
+    of the lisp up to the selected element, arbitrary vector elements are
+    accessed in constant time. The length of a vector is the number of elements
+    it contains. Vectors are indexed by exact nonnegative integers, and the
+    index of the 1st element of any vector is 0. The highest valid index for
+    a given vector is one less than its length. As with lists, the elements of
+    a vector can be any type, and a single vector can hold more than one type
+    of object.
+
+    #(1 2 3)               ;; invalid syntax, should use '#(1 2 3)
+    (vector)               ;; abbr. form '#(), a empty vector
+    (vector 1 2 3)         ;; abbr. form '#(1 2 3), a number vector
+    (vector 'a 'b 'c)      ;; abbr. form '#(a b c), a symbol vector
+    (vector a b c)         ;; abbr. from `#(,a ,b ,c), a vector has three values
+    (vector? (vector))     ;; #t
+    (vector? '#())         ;; #t
+    (make-vector 0)        ;; '#()
+    (make-vector 2)        ;; the elements are unspecified, but '#(0 0) for both ChezScheme and Racket
+    (make-vector 2 "a")    ;; '#("a" "a"), a string vector with 2 same string
+    (vector-length '#())   ;; 0
+    (vector-ref '#(a) 0)   ;; 'a
+    (vector-ref '#('a) 0)  ;; ''a
+    (vector-ref '#("a") 0) ;; "a"
+    (vector-set! v n value)
+    (vector-fill! v value)
+    (vector->list v)
+    (list->vector l)
+    (vector-sort pred v) -> vector, pred must return true if the 1st arg's value preceded its 2nd arg's value
+    (vector-sort! pred v) -> unspecified
+    (vector-sort < '#(3 4 2 1 2 5))  ;; '#(1 2 2 3 4 5), should write (vector-sort '#(3 4 2 1 2 5) <) in Racket
+    (vector-sort > '#(0.5 3/4))      ;; '#(3/4 0.5), should write (vector-sort '#(0.5 3/4) >) in Racket
+
+    (define a 'symbol)
+    (define b "string")
+    (define c 3.14)
+    (define v '#(a b c))      ;; '#(a b c)
+    (vector-ref v 0)          ;; 'a
+    (vector-ref v 1)          ;; 'b
+    (vector-ref v 2)          ;; 'c
+    (define v `#(,a ,b ,c))   ;; '#(symbol "string" 3.14)
+    (vector-ref v 0)          ;; 'symbol
+    (vector-ref v 1)          ;; "string"
+    (vector-ref v 2)          ;; 3.14
+    (define v (vector a b c)) ;; '#(symbol "string" 3.14)
+    (vector-ref v 0)          ;; 'symbol
+    (vector-ref v 1)          ;; "string"
+    (vector-ref v 2)          ;; 3.14
+
+    -- ChezScheme --
+
+    All vectors are mutable by default, including constants. A program can
+    create immutable vectors via vector->immutable-vector. Any attempt to
+    modify an immutable vector causes an exception to be raised.
+
+    (vector-copy v) -> vector
+    (mutable-vector? v)
+    (immutable-vector? v)
+    (vector->immutable-vector v)
+
+
+    ;; bytevectors
+
+    Bytevectors are vectors of raw binary data. Although nominally organized as
+    a sequence of exact unsigned 8-bit integers, a bytevector can be interpreted
+    as a sequence of exact signed 8-bit integers, exact signed or unsigned
+    16-bit, 32-bit, 64-bit, or arbitrary-precision integers, IEEE single or
+    double floating-point numbers, or arbitrary combinations of the above.
+    The length of a bytevector is the number of 8-bit bytes it stores, and
+    indices into a bytevector are always given a byte offsets.
+
+    '#vu8(1 2 3)
+    #vu8(1 2 3)                ;; valid, bytevectors are self-evaluated like string, so they need not be quoted
+    (make-bytevector 0)        ;; #vu8()
+    (make-bytevector 2)        ;; the elements are unspecified, but #vu8(0 0) in ChezScheme
+    (make-bytevector 2 7)      ;; #vu8(7 7)
+    (bytevector-length #vu8()) ;; 0
+    (bytevector-u8-ref v index)
+    (bytevector-s8-ref v index)
+    (bytevector-u16/32/64-native-ref v index)
+    (bytevector-s16/32/64-native-ref v index)
+    (bytevector-u16/32/64-ref v index endian)
+    (bytevector-s16/32/64-ref v index endian)
+    (bytevector-ieee-single-native-ref v index)
+    (bytevector-ieee-double-native-ref v index)
+    (bytevector-ieee-single-ref v index endian)
+    (bytevector-ieee-double-ref v index endian)
+
+    -- ChezScheme --
+
+    ChezScheme extends the set of bytevector primitives, including primitives
+    for loading and storing 3, 5, 6, and 7-byte quantities. All bytevectors are
+    mutable by default, including constants. A program can create immutable
+    bytevectors via bytevector->immutable-bytevector. Any attempt to modify an
+    immutable bytevector causes an exception to be raised.
+
+
+    ;; hashtables
+
+    Hashtables grow as needed, but when the hashtable grows it generally must
+    rehash all of the existing elements. Providing a nonzero size can help
+    limit the amount of rehashing that must be done as the table is initially
+    populated. An eq hashtable compares keys using the eq? (pointer equality)
+    procedure and typically employs a hash function based on object address.
+    An eqv hashtable compares keys using the eqv? procedure and typically
+    employs a hash function based on object addresses for objects. Gernerally,
+    hashtable computes hash values using hash function and compares the keys
+    using equal function. The equal function should compare two keys and return
+    false only if the two keys should be distinguished. The hash function
+    accept a key as an argument and return a nonnegative exact integer value.
+
+    (make-eq-hashtable)
+    (make-eq-hashtable n)
+    (make-eqv-hashtable)
+    (make-eqv-hashtable n)
+    (make-hashtable hashfunc eqfunc)
+    (make-hashtable hashfunc eqfunc n)
+    (hashtable-hash-function h)        ;; return the hash function
+    (hashtable-equivalence-function h) ;; return the equal function
+    (symbol-hash s)    ;; suitable for using symbol=? as equal function
+    (string-hash s)    ;; suitable for using string=? as equal function
+    (string-ci-hash s) ;; suitable for using string-ci=? as equal function
+    (equal-hash key)   ;; suitable for using equal? as equal function
+    (hashtable-set! h key value)
+    (hashtable-delete! h key)
+    (hashtable-clear! h)           ;; clear all entries from hashtable
+    (hashtable-clear! h size)      ;; clear all entries from hashtable and reset the size
+    (hashtable-ref h key default)  ;; if no such key, return the default value
+    (hashtable-contains? h key)
+    (hashtable-size h)
+    (hashtable-copy h)             ;; returned hashtable is immutable
+    (hashtable-copy h mutable)     ;; can returned a mutable hashtable
+    (hashtable-mutable? h)
+    (hashtable-keys h)             ;; return a vector contains all keys
+    (hashtable-entries h)          ;; return two vectors for keys and values
+
+    -- ChezScheme --
+
+    ChezScheme provides several extensions to the hashtable mechanism, including
+    a mechanism for directly accessing a key, value pair in a hashtable, support
+    weak eq and eqv hashtables, and a set of procedures specialized to eq and
+    symbol hashtables.
+
+    The weak eq/eqv hashtables are like make-eq/eqv-hashtable except the keys
+    of the hashtable are held weakly, i.e., they are not protected from the
+    garbage collector. Keys reclaimed by the garbage collector are removed from
+    the table, and their associated values are dropped the next time the
+    table is modified, if not sonner. Values in the hashtable are referenced
+    normally as long as the key is not reclaimed, since keys are paired with
+    values using weak pairs. Consequently, if a value in the hashtable refers
+    to its own key, then garbage collection is prevented from reclaiming the
+    key. A copy of a weak hashtable created by hashtable-copy is also weak.
+    If the copy is immutable, inaccessible keys may still be dropped from the
+    hashtable, even though the contents of the table is otherwise unchanging.
+    The effect of this can be observed via hashtable-keys and hashtable-entries.
+
+    The ephemeron hashtables are like weak hashtable, but a value in the
+    hashtable can refer to a key in the hashtable (directly or indirectly)
+    without preventing garbage collection from reclaiming the key, because
+    keys are paired with values using ephemeron pairs. A copy of an ephemeron
+    hashtable created by hashtable-copy is also an ephemeron table, and an
+    inaccesible key can be dropped from an immutable ephemeron hashtable in
+    the same way as for an immutable weak hashtable.
+
+    (hashtable-values h)           ;; return a vector contains all values
+    (hashtable-cell h key default) ;; return a key/value pair
+    (make-weak-eq/eqv-hashtable)
+    (make-weak-eq/eqv-hashtable n)
+    (make-ephemeron-eq/eqv-hashtable)
+    (make-ephemeron-eq/eqv-hashtable n)
+    (hashtable-weak? h)
+    (hashtable-ephemeron? h)
+    (eq-hashtable-weak? h)
+    (eq-hashtable-ephemeron? h)
+    (eq/symbol-hashtable? h)
+    (eq/symbol-hashtable-set! h key value)
+    (eq/symbol-hashtable-ref h key default)
+    (eq/symbol-hashtable-contains? h key)
+    (eq/symbol-hashtable-cell h key default)
+    (eq/symbol-hashtable-delete! h key)
+
+
     ;; string port
 
     (open-output-string)   ;; return a new string output port
@@ -57,4 +391,48 @@
   script (tag-stx)
   body body-stx)
 
+
+(define-syntax (define-html-template stx)
+
+宏不过是将源代码中的一段语法替换成新的语法，然后编译器对新的语法进行编译。
+
+(define-html-template my-html-page
+  "the page new title"
+  body-tmpl)
+
+(define-syntax (define-html-template stx)
+  (syntax-case stx ()
+    ((_ variable-name title body) #'(define variable-name (apply-html-template title body)))))
+
+(define-syntax (apply-html-template stx)
+  (syntax-case stx ()
+    ((_ title body) #'(apply-html-template-detail lang.cn title body))
+    ((_ title body lang) #'(apply-html-template-detail lang title body))))
+
+(define-syntax
+       (html (@ (lang (% lang)))
+         (title (% page-title))
+         (body ($ body)))
+
+(define-template html-template
+  (html (@ (lang % page-lang))
+    (head
+      (meta (@ (charset %)))
+      (meta (@ (http-equiv "X-UA-Compatible") (content "IE=Edge")))
+      (title %))
+    (body %)))
+
+(html-template my-html-page
+  'page-lang %en
+  'charset %utf8
+  'title "the new page title"
+  'body my-page-content)
+
+(define my-html-page
+  '(html (@ (lang "en"))
+     (head
+       (meta (@ (charset "utf8")))
+       (meta (@ (http-equiv "X-UA-Compatible") (content "IE=Edge")))
+       (title "the new page title")
+    (body (% my-page-content)))))
 
