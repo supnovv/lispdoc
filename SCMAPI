@@ -467,8 +467,6 @@ References
     This function calls the zero-arg-func, and redirect its current output
     port to a new string output port, and then returned the result string.
 
-    ;; port operations
-
     (block-write port s)
     (block-write port s n)
     (clear-output-port port)
@@ -484,6 +482,67 @@ References
     The default port is current-output-port, its initial value is the same
     port as the initial value of console-output-port. Other pre-defined ports
     are including console-error-port, current-error-port.
+
+
+    ;; syntactic extensions
+
+    Syntactic extensions, or macros, are used to simplify and regularize
+    repeated patterns in a program, to introduce syntactic forms with new
+    evaluation rules, and to perform transformations that help make programs
+    more efficient. A syntactic extension most often takes the form (keyword
+    subform ...), where keyword is the identifier that names the syntactic
+    extension. The syntax of each subform varies from one syntactic extension
+    to another. Syntactic extensions can also take the form of improper lists
+    or even singleton identifiers.
+
+    New syntacitic extensions are defined by associating keywords with
+    transformation procedures, or transformers. Syntactic extensions are
+    defined using define-syntax forms or using let-syntax or letrec-syntax.
+    Syntactic extensions are expanded into core forms at the start of
+    evaluation (before compilation or interpretation) by a syntax expander.
+    If the expander encounters a syntactic extension, it invokes the
+    associated transformer to expand the syntactic extension, then repeats
+    the expansion process for the form returned by the transformer. If the
+    expander encoutners a core syntactic form, it recursively processes the
+    subforms, if any, and reconstructs the form from the expanded subforms.
+    Information about identifier bindings is maintained during expansion to
+    enforce lexical scoping for variables and keywords.
+
+    (define-syntax keyword transformer)
+    (let-syntax ((keyword transformer) ...) <body>)
+    (letrec-syntax ((keyword transformer) ...) <body>)
+
+
+    (define-syntax let*
+      (syntax-rules ()
+        ((_ () b1 b2 ...) (let () b1 b2 ...))
+        ((_ ((a1 e1)) b1 b2 ...) (let (a1 e1) b1 b2 ...))
+        ((_ ((a1 e1) (a2 e2) ...) b1 b2 ...)
+         (let ((a1 e1))
+           (let* ((a2 e2) ...) b1 b2 ...)))))
+
+
+    ;; object oriented style
+
+    (symbol-hashtable t 32)
+    (symbol-hashtable t 32 'key "string" 'len 3.14)
+    (& t.set 'newkey 100)
+    (& t.ref 'key)
+    (& t.del 'len)
+
+    (define x '(1 2 3))
+    (define y 100)
+    (define z #t)
+    (define-syntax (expand-according-to-real-time-value stx)
+      (syntax-case stx ()
+        ((_ var) (cond ((list? #'var) #'(display "list"))
+                       ((number? #'var) #'(display "number"))
+                       ((boolean? #'var) #'(display "boolean"))
+                       (else #'(display "else-values"))))))
+    (expand-according-to-real-time-value x)
+    (expand-according-to-real-time-value y)
+    (expand-according-to-real-time-value z)
+
 
 (define-syntax (html-template stx)
   (syntax-case stx ()
