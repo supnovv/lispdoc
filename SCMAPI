@@ -484,7 +484,7 @@ References
     are including console-error-port, current-error-port.
 
 
-    ;; syntactic extensions
+    ;; macros
 
     Syntactic extensions, or macros, are used to simplify and regularize
     repeated patterns in a program, to introduce syntactic forms with new
@@ -508,18 +508,287 @@ References
     Information about identifier bindings is maintained during expansion to
     enforce lexical scoping for variables and keywords.
 
-    (define-syntax keyword transformer)
-    (let-syntax ((keyword transformer) ...) <body>)
-    (letrec-syntax ((keyword transformer) ...) <body>)
-
+    (define-syntax <name> <transformer>)
+    (let-syntax ((<name> <transformer>) ...) <body-expression> ...)
+    (letrec-syntax ((<name> <transformer>) ...) <body-expression> ...)
+    (identifier? <syntax-object>)
+    (free-identifier=? <syntax-object> <syntax-object>)
+    (bound-identifier=? <syntax-object> <syntax-object>)
 
     (define-syntax let*
       (syntax-rules ()
         ((_ () b1 b2 ...) (let () b1 b2 ...))
-        ((_ ((a1 e1)) b1 b2 ...) (let (a1 e1) b1 b2 ...))
         ((_ ((a1 e1) (a2 e2) ...) b1 b2 ...)
          (let ((a1 e1))
            (let* ((a2 e2) ...) b1 b2 ...)))))
+
+    (let ((f (lambda (x) (+ x 1))))
+      (let-syntax ((f (syntax-rules () ((_ x) x)))
+                   (g (syntax-rules () ((_ x) (f x))))  ;; f is the one in let
+        (list (f 1) (g 1))))) => (list 1 (f 1))
+                              => (list 1 2)
+
+    (let ((f (lambda (x) (+ x 1))))
+      (letrec-syntax ((f (syntax-rules () ((_ x) x)))
+                      (g (syntax-rules () ((_ x) (f x)))) ;; f is the previous f in letrec-syntax
+        (list (f 1) (g 1))))) => (list 1 (f 1))
+                              => (list 1 1)
+
+    (syntax-rules (literal ...) ((_ pattern) template) ...)
+
+    syntax-rules returns a transformer. Each literal must be an identifier
+    other than an underscore (_) or ellipsis (...). Each pattern specifies one
+    possible syntax that the input form might take, and the corresponding
+    template specifies how the output should appear.
+
+    匹配模式（pattern）用于匹配输入语法，模式中可以包含列表（list）、
+    数组（vector）、标识符（identifier）、和常量（constant）。标识符
+    （identifier）是一个字面量（literal）、匹配变量（pattern variable）、
+    下划线（underscore）、或省略号（ellipsis）。
+
+    列表和数组可以指定输入语法的基本语法结构，下划线和匹配变量用于匹配
+    对应位置的任意语法，省略号用于匹配上一个模式零次或多次，字面量和常量
+    必须在字面上精确匹配。
+
+    匹配模式中的元素
+    1. 列表和数组        -> 匹配指定结构
+    2. 字面量和常量      -> 字面精确匹配，字面量与匹配的语法标识符必须是相等的自由标识符（free-identifier=?）
+    3. 下划线和匹配变量  -> 匹配对应位置的语法片段，语法片段被绑定到匹配变量中能在后面的模板（template）中使用
+    4. 省略号（...）     -> 匹配前一个模式零次或多次
+    5. 点号（.）和 Px    -> 匹配后面所有项（零个或多个），这些项形成的列表被绑定到匹配变量 Px 中
+
+    模板（template）用于产生新的语法，模板可以是一个匹配变量，字面量和常量，
+    ，子模板列表 (S1 ... Sn)，子模板非正式（improper）列表 (S1 ... Sn . T)，
+    子模板数组 #(S1 ... Sn)，或省略号。
+
+    (define-syntax a (identifier-syntax <template>))  ;; identifier will expand to <template>
+    (define-syntax a
+      (identifier-syntax
+        (id (get-value))
+        ((set! id e) (set-value! e))))  ;; the identifier can be set!
+
+    identifier-syntax 是通过 make-variable-transformer 实现的。
+
+    (define-syntax keyword transformer)
+    (let-syntax ((keyword transformer) ...) <expr> ...)
+    (letrec-syntax ((keyword transformer) ...) <expr> ...)
+
+    (define-syntax let*
+      (syntax-rules ()
+        ((_ () b1 b2 ...) (let () b1 b2 ...))
+        ((_ ((a1 e1) (a2 e2) ...) b1 b2 ...)
+         (let ((a1 e1))
+           (let* ((a2 e2) ...) b1 b2 ...)))))
+
+    (syntax-case stx (literal ...) <caluse> ...)
+    <caluse> = (pattern expr) | (pattern fender 
+
+    (syntax-rules (<literal> ...)
+      ((_ <pattern>) <template>)
+      ...)
+
+    (syntax-case <input-syntax-object> (<literal> ...)
+      <clause>
+      ...)
+
+    <clause> = (<pattern> <the-expression-that-can-generate-output-syntax-object>)
+             | (<pattern> <fender> <the-expression-that-can-generate-output-syntax-object>)
+
+
+    (define-syntax (syntax-rules stx)
+      (syntax-case stx ()
+        ((_ (literal ...) ((name . pattern) template) ...)
+         #'(lambda (stx)
+             (syntax-case stx (literal ...)
+               ((_ . pattern) #'template) ...)))))
+
+    (define-syntax foo
+      (syntax-rules ()
+        ((_ x y z) (g x y z)))
+
+ => (define-syntax foo
+      (lambda (stx)
+        (syntax-case stx ()
+          ((_ . (x y z)) #'(g x y z))))
+
+ => (define-syntax foo
+      (lambda (stx)
+        (syntax-case stx ()
+          ((_ x y z) #'(g x y z))))
+
+    -- syntax-case
+
+    (syntax-case <input-syntax-object-expression> (<literal> ...)
+      <clause>
+      ...)
+
+    <clause> = (<pattern> <output-syntax-object-expression>)
+             | (<pattern> <fender> <output-syntax-object-expression>)
+
+    (with-syntax ((<pattern> 
+
+    (define-syntax (with-syntax stx)
+      (syntax-case stx ()
+        ((_ ((p e) ...) b1 b2 ...)
+         #'(syntax-case (list e ...) ()
+             ((p ...) (let () b1 b2 ...))))))
+
+    语法形式 syntax-case 首先对输入语法对象表达式求值，然后依次与子句中的
+    模式进行匹配并检查过滤条件（如果存在），直到一个子句匹配成功，求值该
+    子句中的结果语法对象表达式，最后返回该语法对象。如果没有一个子句能够
+    匹配成功，会报语法错误。
+
+    A syntax object may be any of the following.
+
+      * a nonpair, nonvector, nonsymbol value
+      * a pair of syntax objects
+      * a vector of syntax objects
+      * a wrapped object
+
+    The wrapped object contains contextual information about a form in addition
+    to its structure. This contextual information is used by the expander to
+    maintain lexical scoping. It may also contain information used by the
+    implementation to correlate source and object code, e.g., track file, line,
+    and character information through the expansion and compilation process.
+
+    (syntax->datum stx) ;; all syntactic information of syntax object are striped
+    (datum->syntax <syntax-object> <datum>)
+
+    datum->syntax constructs a syntax object from <datum> that contains the
+    same contextual nformation as <sytax-object>, with the effect that the
+    it behaves as if it were introduced into the code when <syntax-object> was
+    introuduced. The <syntax-object> is often the keyword of an input form,
+    extracted from the from.
+
+    datum->syntax allows a transformer to "bend" lexical scoping rules by
+    creating implicit identifiers that behave as if they were present in the
+    input form, thus permitting the definition of syntactic extensions that
+    introduce visible bindings for or reference to identifiers that do not
+    appear explicitly in the input form. For example, we can define a loop
+    expression that binds the variable break to an escape procedure within
+    the loop body.
+
+    (define-syntax (loop stx)
+      (syntax-case stx ()
+        ((k e ...)
+         (with-syntax ((break (datum->syntax #'k 'break)))
+           #'(call/cc (lambda (break) (let f () e ... (f))))))))
+
+    (let ((n 3) (l '()))
+      (loop
+        (if (= n 0) (break l))
+        (set! ls (cons 'a l))
+        (set! n (- n 1)))
+
+    -- ChezScheme --
+
+    When defining sets of dependent macros, it is often convenient to attach
+    information to identifiers in the same compile time environment that the
+    expander uses to record information about variables, keywords, module
+    names, etc. ChezScheme provides two mechanisms for attaching information
+    to identifiers in the compile-time environment: compile-time values and
+    compile-time properties.
+
+    A compile-time value is a kind of transformer that can be associated with
+    an identifier via define-syntax, let-syntax, letrec-syntax. When an
+    identifier is associated with a compile-time value, it cannot also have
+    any other meaning, and an attempt to reference it as an ordinary identifier
+    results in a syntax error. A compile-time property, on the other hand, is
+    maintained alongside an existing binding, providing additional information
+    about the binding. Properties are ignored when ordinary references to an
+    identifier occur.
+
+    The mechanisms used by a macro to obtain compile-time values and properties
+    are similar. In both cases, the marcor's transformer returns a procedure p
+    rather than a syntax object. The expander invokes p with one argument, an
+    environment-lookup procedure lookup, which p can then use to obtain
+    compile-time values and properties for one or more identifiers before it
+    constructs the macro's final output. lookup accepts one or two identifer
+    arguments. With one argument, id, lookup returns the compile-time value of
+    id, or #f if id has no compile-time value. With two arguemnts, id and key,
+    lookup returns the value of id's key property, or #f if id has no key
+    property.
+
+
+    (define-property <identifier> <key> <value>)
+
+    Attaches a property to an existing identifier binding without disturbing
+    the existing meaning of the identifier in the scope of that binding. It
+    is typically used by one macro to record information about a binding for
+    use by another macro. Both <identifier> and <key> must be identifiers.
+    The <value> expression is evaluated when the define-property form is
+    expanded, and a new property associating <key> with the <value> is attached
+    to the existing binding of <identifier>, which must have a visible local
+    or top-level binding.
+
+    (define type)
+    (define x "x-value")
+    (define-property x type 'string)
+    (define-syntax (get-type stx)
+      (lambda (lookup)
+        (syntax-case stx ()
+          ((_ id)
+           (begin (define type (lookup #'id #'type))
+                  #`'#,(datum->syntax stx type))))))
+    (get-type x)
+
+
+    (module <name> (<export-interface> ...) <module-body>)
+    (module (<export-interface> ...) <module-body>)
+
+    Modules are used to help organize programs into separate parts that interact
+    cleanly via declared interfaces. Although modular programming is typically
+    used to facilitate the development of large programs possibly written by
+    many individuals, it may also be used in ChezScheme at a "micro-modular"
+    level, since ChezCheme module and import forms are definitions and may
+    appear anywhere any other kind of definition may appear, including within
+    a lambda body or other local scope.
+
+    Modules control visibility of bindings and can be viewed as extending
+    lexical scoping to allow more precise control over where bindings are or
+    not visible. Modules export identifier bindings, i.e., variable bindings,
+    keyword bindings, or module name bindings. Modules may be named or
+    anonymous. Bindings exported from a named module may be made visible via an
+    import form whereever the module's name is visible. Bindings exported from
+    an anonymouse module are implicity imported where the module from appears.
+    Anonymous modules are useful for hiding some of a set of bindgins while
+    allowing the remaining bindings in the set to be visible.
+
+
+    (meta define x 3)
+    (meta define (f a b) <body>)
+    (meta begin <expr> ...)
+    (meta module (export-interface> ...) <module-body>)
+    (meta include "path")
+
+    The meta keyword is actually a prefix that can be placed in front of any
+    definition keyword. It tells the expander that any variable definition
+    resulting from the definition is to be an expand-time definition available
+    only to the right-hand sides of other meta definitions and, most
+    importantly, transformer expressions. It is used to define expand-time
+    helpers and other information for use by one or more syntax-case
+    transformers.
+
+    The right-hand-side expressions of a syntax definition or meta function
+    can refer only to identifiers whose values are already available in the
+    compile-time environment. Because of the left-to-right expansion order
+    for library, module, lambda, and similar body, this implies a semantics
+    similar to let* for a sequence of meta definitions, in which right-hand
+    side can refer only the the variables defined earlier in the sequence.
+    An exception is that the right-hand side of a meta definition can refer
+    to its own name as long as the reference is not evaluated until after
+    the value of the expression has been computed. This permits meta definitions
+    to be self-recursive but not mutually recursive. The right-hand side of a
+    meta definition can, however, build syntax objects containing occurrences
+    of any identifiers defined in the body in which the meta definition appears.
+
+
+    (define-syntax meta-cond
+      (syntax-rules ()
+        ((_ (test expr1 expr2 ...) ...)
+         (let-syntax ((expr (cond (test (identifier-syntax (begin expr1 expr2 ...)))
+                                  ...)))
+           expr))))
 
 
     ;; object oriented style
@@ -542,7 +811,6 @@ References
     (expand-according-to-real-time-value x)
     (expand-according-to-real-time-value y)
     (expand-according-to-real-time-value z)
-
 
 (define-syntax (html-template stx)
   (syntax-case stx ()
