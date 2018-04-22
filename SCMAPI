@@ -791,26 +791,278 @@ References
            expr))))
 
 
-    ;; object oriented style
+ | syntax-lower-type
 
-    (symbol-hashtable t 32)
-    (symbol-hashtable t 32 'key "string" 'len 3.14)
-    (& t.set 'newkey 100)
-    (& t.ref 'key)
-    (& t.del 'len)
+(meta define (syntax-lower-type stx)
+  (let ((d (syntax->datum stx)))
+    (cond
+      ((identifier? stx) 'identifier)
+      ((string? d) 'string)
+      ((number? d) 'number)
+      ((char? d) 'character)
+      ((boolean? d) 'boolean)
+      ((vector? d) 'vector)
+      ((bytevector? d) 'bytevector)
+      ((null? d) 'null)
+      ((list? d)
+         (let ((1st (car d))
+               (2nd (if (null? (cdr d)) (void) (cadr d))))
+           (cond
+             ((eq? 2nd (void)) 'list)
+             ((eq? 1st 'syntax) 'syntax-object)
+             ((eq? 1st 'quasisyntax) 'quasisyntax-object)
+             ((eq? 1st 'quasiquote) 'quasiquote-datum)
+             ((eq? 1st 'quote)
+                (cond
+                  ((identifier? (datum->syntax #'1st 2nd)) 'symbol)
+                  ((string? 2nd) 'quote-string)
+                  ((number? 2nd) 'quote-number)
+                  ((char? 2nd) 'quote-character)
+                  ((boolean? 2nd) 'quote-boolean)
+                  ((vector? 2nd) 'quote-vector)
+                  ((bytevector? 2nd) 'quote-bytevector)
+                  ((null? 2nd) 'quote-null)
+                  ((list? 2nd)
+                     (let ((name (car 2nd)))
+                       (cond
+                         ((eq? name 'quote) 'quote-datum)
+                         ((eq? name 'quasiquote) 'quote-datum)
+                         ((eq? name 'syntax) 'quote-datum)
+                         ((eq? name 'quasisyntax) 'quote-datum)
+                         (else 'quote-list))))
+                  ((pair? 2nd) 'quote-pair)
+                  (else 'quote-datum)))
+             (else 'list))))
+      ((pair? d) 'pair)
+      (else 'unknown-datum))))
 
-    (define x '(1 2 3))
-    (define y 100)
-    (define z #t)
-    (define-syntax (expand-according-to-real-time-value stx)
+(define-syntax (display-syntax-lower-type stx)
       (syntax-case stx ()
-        ((_ var) (cond ((list? #'var) #'(display "list"))
+        ((_ a) (let* ((s #'a)
+                      (d (syntax->datum s)))
+                 (write s) (newline)
+                 (write d) (newline)
+                 (write (syntax-lower-type s))
+                 #'(newline)))))
+
+(display-syntax-lower-type abc)
+#<syntax:201:27 abc>
+abc
+identifier
+
+(display-syntax-lower-type 'abc)
+#<syntax:239:27 (quote abc)>
+(quote abc)
+symbol
+
+(display-syntax-lower-type "abc")
+#<syntax:202:27 "abc">
+"abc"
+string
+
+(display-syntax-lower-type 3/14)
+#<syntax:286:27 3/14>
+3/14
+number
+
+(display-syntax-lower-type #\a)
+#<syntax:287:27 #\a>
+#\a
+character
+
+(display-syntax-lower-type #t)
+#<syntax:288:27 #t>
+#t
+boolean
+
+(display-syntax-lower-type ())
+#<syntax:290:27 ()>
+()
+null
+
+(display-syntax-lower-type (1))
+#<syntax:340:27 (1)>
+(1)
+list
+
+(display-syntax-lower-type (1 2))
+#<syntax:566:27 (1 2)>
+(1 2)
+list
+
+(display-syntax-lower-type (1 . 2))
+#<syntax:390:27 (1 . 2)>
+(1 . 2)
+pair
+
+(display-syntax-lower-type #())
+#<syntax:289:27 #()>
+#()
+vector
+
+(display-syntax-lower-type #(1))
+#<syntax:568:27 #(1)>
+#(1)
+vector
+
+(display-syntax-lower-type #(1 2))
+#<syntax:569:27 #(1 2)>
+#(1 2)
+vector
+
+(display-syntax-lower-type #vu8())
+#<syntax #vu8()>
+#vu8()
+bytevector
+
+(display-syntax-lower-type #vu8(1))
+#<syntax #vu8(1)>
+#vu8(1)
+bytevector
+
+(display-syntax-lower-type #vu8(1 2))
+#<syntax #vu8(1 2)>
+#vu8(1 2)
+bytevector
+
+(display-syntax-lower-type '"str")
+#<syntax:391:27 (quote "str")>
+(quote "str")
+quote-string
+
+(display-syntax-lower-type '3.14)
+#<syntax:392:27 (quote 3.14)>
+(quote 3.14)
+quote-number
+
+(display-syntax-lower-type '#\a)
+#<syntax:393:27 (quote #\a)>
+(quote #\a)
+quote-character
+
+(display-syntax-lower-type '#t)
+#<syntax:394:27 (quote #t)>
+(quote #t)
+quote-boolean
+
+(display-syntax-lower-type '())
+#<syntax:495:28 (quote ())>
+(quote ())
+quote-null
+
+(display-syntax-lower-type '(1))
+#<syntax:496:28 (quote (1))>
+(quote (1))
+quote-list
+
+(display-syntax-lower-type '(1 2))
+#<syntax:497:28 (quote (1 2))>
+(quote (1 2))
+quote-list
+
+(display-syntax-lower-type '(1 . 2))
+#<syntax:498:28 (quote (1 . 2))>
+(quote (1 . 2))
+quote-pair
+
+
+(display-syntax-lower-type '#())
+#<syntax:570:27 (quote #())>
+(quote #())
+quote-vector
+
+(display-syntax-lower-type '#(1))
+#<syntax:571:27 (quote #(1))>
+(quote #(1))
+quote-vector
+
+(display-syntax-lower-type '#(1 2))
+#<syntax:572:27 (quote #(1 2))>
+(quote #(1 2))
+quote-vector
+
+(display-syntax-lower-type '#vu8())
+#<syntax (quote #vu8())>
+(quote #vu8())
+quote-bytevector
+
+(display-syntax-lower-type '#vu8(1))
+#<syntax (quote #vu8(1))>
+(quote #vu8(1))
+quote-bytevector
+
+(display-syntax-lower-type '#vu8(1 2))
+#<syntax (quote #vu8(1 2))>
+(quote #vu8(1 2))
+quote-bytevector
+
+(display-syntax-lower-type #'a)
+#<syntax:499:28 (syntax a)>
+(syntax a)
+syntax-object
+
+(display-syntax-lower-type #`a)
+#<syntax:500:28 (quasisyntax a)>
+(quasisyntax a)
+quasisyntax-object
+
+(display-syntax-lower-type 'a)
+#<syntax:575:27 (quote a)>
+(quote a)
+symbol
+
+(display-syntax-lower-type `a)
+#<syntax:501:28 (quasiquote a)>
+(quasiquote a)
+quasiquote-datum
+
+(display-syntax-lower-type ''a)
+#<syntax:560:27 (quote (quote a))>
+(quote (quote a))
+quote-datum
+
+(display-syntax-lower-type '`a)
+#<syntax:561:27 (quote (quasiquote a))>
+(quote (quasiquote a))
+quote-datum
+
+(display-syntax-lower-type '#'a)
+#<syntax:562:27 (quote (syntax a))>
+(quote (syntax a))
+quote-datum
+
+(display-syntax-lower-type '#`a)
+#<syntax:563:27 (quote (quasisyntax a))>
+(quote (quasisyntax a))
+quote-datum
+
+(display-syntax-lower-type '#`'a)
+#<syntax:564:27 (quote (quasisyntax (quote a)))>
+(quote (quasisyntax (quote a)))
+quote-datum
+
+
+
+ | object oriented style
+
+(symbol-hashtable t 32)
+(symbol-hashtable t 32 'key "string" 'len 3.14)
+(& t.set 'newkey 100)
+(& t.ref 'key)
+(& t.del 'len)
+
+(define x '(1 2 3))
+(define y 100)
+(define z #t)
+(define-syntax (expand-according-to-real-time-value stx)
+  (syntax-case stx ()
+    ((_ var) (cond ((list? #'var) #'(display "list"))
                        ((number? #'var) #'(display "number"))
                        ((boolean? #'var) #'(display "boolean"))
                        (else #'(display "else-values"))))))
-    (expand-according-to-real-time-value x)
-    (expand-according-to-real-time-value y)
-    (expand-according-to-real-time-value z)
+(expand-according-to-real-time-value x)
+(expand-according-to-real-time-value y)
+(expand-according-to-real-time-value z)
 
 (define-syntax (html-template stx)
   (syntax-case stx ()
