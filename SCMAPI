@@ -791,9 +791,9 @@ References
            expr))))
 
 
- | syntax-lower-type
+ | syntax and veriable type
 
-(meta define (syntax-lower-type stx)
+(meta define (syntax-type stx)
   (let ((d (syntax->datum stx)))
     (cond
       ((identifier? stx) 'identifier)
@@ -801,19 +801,22 @@ References
       ((number? d) 'number)
       ((char? d) 'character)
       ((boolean? d) 'boolean)
-      ((vector? d) 'vector)
       ((bytevector? d) 'bytevector)
+      ((vector? d) 'vector)
       ((null? d) 'null)
       ((list? d)
          (let ((1st (car d))
                (2nd (if (null? (cdr d)) (void) (cadr d))))
            (cond
-             ((eq? 2nd (void)) 'list)
              ((eq? 1st 'syntax) 'syntax-object)
              ((eq? 1st 'quasisyntax) 'quasisyntax-object)
-             ((eq? 1st 'quasiquote) 'quasiquote-datum)
-             ((eq? 1st 'quote)
+             ((eq? 1st 'unsyntax) 'unsyntax-datum)
+             ((eq? 1st 'unsyntax-splicing) 'unsyntax-splicing-datum)
+             ((eq? 1st 'unquote) 'unquote-datum)
+             ((eq? 1st 'unquote-splicing) 'unquote-splicing-datum)
+             ((eq? 1st 'quasiquote)
                 (cond
+                  ((eq? 2nd (void)) 'quasiquote-empty)
                   ((identifier? (datum->syntax #'1st 2nd)) 'symbol)
                   ((string? 2nd) 'quote-string)
                   ((number? 2nd) 'quote-number)
@@ -822,30 +825,68 @@ References
                   ((vector? 2nd) 'quote-vector)
                   ((bytevector? 2nd) 'quote-bytevector)
                   ((null? 2nd) 'quote-null)
-                  ((list? 2nd)
-                     (let ((name (car 2nd)))
-                       (cond
-                         ((eq? name 'quote) 'quote-datum)
-                         ((eq? name 'quasiquote) 'quote-datum)
-                         ((eq? name 'syntax) 'quote-datum)
-                         ((eq? name 'quasisyntax) 'quote-datum)
-                         (else 'quote-list))))
+                  ((list? 2nd) 'quasiquote-list)
                   ((pair? 2nd) 'quote-pair)
-                  (else 'quote-datum)))
+                  (else 'quasiquote-unknown)))
+             ((eq? 1st 'quote)
+                (cond
+                  ((eq? 2nd (void)) 'quote-empty)
+                  ((identifier? (datum->syntax #'1st 2nd)) 'symbol)
+                  ((string? 2nd) 'quote-string)
+                  ((number? 2nd) 'quote-number)
+                  ((char? 2nd) 'quote-character)
+                  ((boolean? 2nd) 'quote-boolean)
+                  ((vector? 2nd) 'quote-vector)
+                  ((bytevector? 2nd) 'quote-bytevector)
+                  ((null? 2nd) 'quote-null)
+                  ((list? 2nd) 'quote-list)
+                  ((pair? 2nd) 'quote-pair)
+                  (else 'quote-unknown)))
              (else 'list))))
       ((pair? d) 'pair)
       (else 'unknown-datum))))
 
-(define-syntax (display-syntax-lower-type stx)
+;; constant - string, number, character, boolean, bytevector
+;; identifier symbol list vector pair unknown
+
+(meta define (syntax-type-class stx)
+  (let ((d (syntax->datum stx)))
+    (cond
+      ((identifier? stx) 'identifier)
+      ((string? d) 'constant)
+      ((number? d) 'constant)
+      ((char? d) 'constant)
+      ((boolean? d) 'constant)
+      ((bytevector? d) 'constant)
+      ((vector? d) 'vector)
+      ((null? d) 'list)
+      ((list? d)
+         (let ((1st (car d))
+               (2nd (if (null? (cdr d)) (void) (cadr d))))
+           (if (or (eq? 1st 'quote) (eq? 1st 'quasiquote))
+               (cond
+                 ((eq? 2nd (void)) 'list)
+                 ((identifier? (datum->syntax #'1st 2nd)) 'symbol)
+                 ((string? 2nd) 'constant)
+                 ((number? 2nd) 'constant)
+                 ((char? 2nd) 'constant)
+                 ((boolean? 2nd) 'constant)
+                 ((bytevector? 2nd) 'constant)
+                 (else 'list)))
+               'list)))
+      ((pair? d) 'pair)
+      (else 'unknown)))
+
+(define-syntax (display-syntax-type stx)
       (syntax-case stx ()
         ((_ a) (let* ((s #'a)
                       (d (syntax->datum s)))
                  (write s) (newline)
                  (write d) (newline)
-                 (write (syntax-lower-type s))
+                 (write (syntax-type s))
                  #'(newline)))))
 
-(display-syntax-lower-type abc)
+(display-syntax-type abc)
 #<syntax:201:27 abc>
 abc
 identifier
@@ -1046,10 +1087,13 @@ quote-datum
  | object oriented style
 
 (symbol-hashtable t 32)
-(symbol-hashtable t 32 'key "string" 'len 3.14)
-(& t.set 'newkey 100)
-(& t.ref 'key)
-(& t.del 'len)
+(symbol-hashtable t 32
+  (key "string")
+  (len 3.14))
+
+(dot (t.set 'newkey 100)
+     (t.ref 'key)
+     (t.del 'len))
 
 (define x '(1 2 3))
 (define y 100)
