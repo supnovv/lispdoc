@@ -1091,9 +1091,9 @@ quote-datum
   (key "string")
   (len 3.14))
 
-(dot (t.set 'newkey 100)
-     (t.ref 'key)
-     (t.del 'len))
+(dot (t.set newkey 100)
+     (t.ref key)
+     (t.del len))
 
 (define x '(1 2 3))
 (define y 100)
