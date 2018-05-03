@@ -2,8 +2,9 @@
 References
 
 [1] The Revised6 Report on the Algorithmic Language Scheme (http://www.r6rs.org/)
-[1] The Scheme Programming Language 4th Edition (https://www.scheme.com/tspl4/)
-[2] ChezScheme Version 9 User's Guide (http://cisco.github.io/ChezScheme/csug9.5/csug.html)
+[2] The Scheme Programming Language 4th Edition (https://www.scheme.com/tspl4/)
+[3] ChezScheme Version 9 User's Guide (http://cisco.github.io/ChezScheme/csug9.5/csug.html)
+[4] How to Debug ChezScheme Programs (https://www.cs.indiana.edu/chezscheme/debug/)
 
 
     ;; quotes
