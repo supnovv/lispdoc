@@ -5,7 +5,164 @@ References
 [2] The Scheme Programming Language 4th Edition (https://www.scheme.com/tspl4/)
 [3] ChezScheme Version 9 User's Guide (http://cisco.github.io/ChezScheme/csug9.5/csug.html)
 [4] How to Debug ChezScheme Programs (https://www.cs.indiana.edu/chezscheme/debug/)
+[5] Common Lisp Hyperspec (http://www.lispworks.com/documentation/HyperSpec/Front/index.htm)
 
+
+    ;; definitions
+
+    (define var expr)
+    (define var)  ;; equivalent to (define var <unspecified>)
+    (define (var1 ... varn) body1 body2 ...)
+    (define (var1 . args) body1 body2 ...)
+    (define (var1 ... varn . args) body1 body2 ...)
+
+    The first two forms, define creates a new bindgins of var to the value of
+    expr. The expr should not return more than once. That is, it should not
+    return both normally and via the invocation of a continuation obtained
+    during its evaluation, and it should not return twice via two invocations
+    of such a continuation. The remaining are shorthand forms for binding
+    variables to procedures; they are identical to the definitions in terms of
+    lambda.
+
+    (define func (lambda (x y) (display (+ x y))))
+    (func 1 2)   ;; 3
+    (define func (lambda z (display z)))          ;; z receives all arguments as a list
+    (func 1 2)   ;; (1 2)
+    (define func (lambda (x y . z) (display z)))  ;; z receives reminder arguments as a list
+    (func 1 2 3) ;; (3)
+
+    A Scheme lambda expression always produces a procedure with a fixed number
+    of arguments or with an indefinite number of arguments greater than or
+    equal to a certain number. In particular,
+
+    (lambda (var1 ... varn) body1 body2 ...) accepts exactly n arguments,
+    (lambda args body1 body2 ...) accepts zero or more arguments, and
+    (lambda (var1 ... varn . args) body1 body2 ...) accepts n or more arguments.
+
+    But lambda cannot directly produce, however, a procedure that accepts, say,
+    either two or three arguments. In particular, procedures that accept optional
+    arguments are not supported directly by lambda. The latter form of lambda
+    shown above can be used, in conjunction with length checks and compositions
+    of car and cdr, to implement procedures with optional arguments, though
+    at cost of clarity and efficiency.
+
+    The case-lambda syntactic form directly supports procedures with optional
+    arguments as well as procedures with fixed or indefinite numbers of
+    arguments. The case-lambda is based on the lambda* syntactic form introduced
+    in the article "A New Approach to Procedures with Variable Arity".
+
+    (lambda formals body1 body2 ...)
+    (case-lambda (formals body1 body2 ...) ...)
+
+    (define substring2
+      (case-lambda
+        ((s) (substring2 s 0 (string-length s)))
+        ((s start) (substring2 s start (string-length s)))
+        ((s start end) (substring s start end))))
+
+    When a procedure created with case-lambda is invoked, the clauses are
+    considered in order.
+
+    (define-syntax let
+      (syntax-rules ()
+        ((_ ((x e) ...) b1 b2 ...)
+         ((lambda (x ...) b1 b2 ...) e ...))))
+
+    (define-syntax let*
+      (syntax-rules ()
+        ((_ () e1 e2 ...)
+         (let () e1 e2 ...))
+        ((_ ((x1 v1) (x2 v2) ...) e1 e2 ...)
+         (let ((x1 v1))
+           (let* ((x2 v2) ...) e1 e2 ...)))))
+
+    (let name ((var expr) ...) body1 body2 ...)
+
+
+    ;; control operations
+
+    (proc expr1 ...)
+
+    Procedure application is the most basic Scheme control structure. Any
+    structured form without a syntax keyword in the first position is a
+    procedure application. If the first expression proc does not evaluate to
+    a procedure, or if the procedure does not accept the number of arguments
+    provided, an exception with condition type &assertion is raised.
+
+    The order in which the procedure and argument expressions are evaluated
+    is unspecified. It may be left to right, right to left, or any other
+    order. The evaluation is guaranteed to be sequential, however; whatever
+    order is chosen, each expression is fully evaluated before evaluation of
+    the next started.
+
+    (apply proc arg ... list)
+    (apply + '(4 5))
+    (apply min 5 1 3 '(6 8))
+    (apply vector 'a 'b '(c d))
+
+    The apply invokes proc, passing all arguments before list as its heading
+    arguments, and then passing all arguments in the list as the remaining
+    arguments. The apply is useful when some or all of the arguments to be
+    passed to a procedure are in a list, since it frees the programmer from
+    explicity destructuring the list.
+
+    (begin expr1 expr2 ...)
+
+    The expressions expr1 expr2 ... are evaluated in sequence from left to
+    right.
+
+    (if test consequent alternative)
+    (if test consequent)  ;; equvient to (if test consequent <unspecified>)
+    (not expr)
+    (and expr ...)
+    (or expr ...)
+    (cond clause1 clause2 ...)
+
+    Each clause in cond must take one of the forms below. And the "else clause"
+    can only be the last clause.
+
+    (test)                    ;; if test evaluated to true, the value of test is returned
+    (test => expr)            ;; if test evaluated to true, the value of the expr should be a procedure of one argument, return the value of (expr test)
+    (test expr1 expr2 ...)    ;; if test evaluated to ture, the value of the last expression is returned
+    (else expr1 expr2 ...)    ;; the value of the last expression is returned
+
+    If none of the tests evaluates to a true value and no else clause is
+    present, the value or values are unspecified.
+
+    (case expr clause1 clause2 ...)
+    clause => ((key ...) expr1 expr2 ...)
+              (else expr1 expr2 ...)
+
+    First, expr is evaluated and the result is compared (using eqv?) against
+    the keys of each clause in order. If a clause containing a matching key
+    is found, the expression expr1 expr2 ... are evaluated in sequence and
+    the values of the last expression are returned. If none of the clauses
+    contains a matching key and an else clause is present, the expressions
+    expr1 expr2 ... of the else clause are evaluated in sequence and the values
+    of the last expression are returned. If none of the clauses contains a
+    matching key and no else clause is present, the value or values are
+    unspecified.
+
+    (map proc list1 list2 ...)       ;; return a list of the resulting values
+    (for-each proc list1 list2 ...)  ;; same as map but doesn't return the list
+    (vector-map proc vec1 vec2 ...)  ;; return a vector of the resulting values
+    (vector-for-each proc vec1 vec2 ...)
+    (string-for-each proc str1 str2 ...)
+
+    (values obj ...)
+    (call-with-values vals proc)
+
+    While all Scheme primitives and most user-defined procedures return
+    exactly one value, some programming problems are best solved by returning
+    zero values, more than one value, or even a variable number of values.
+    For example, a procedure that partitions a list of values into two sublists
+    needs to return two values. While it is possible for the producer of
+    multiple values to package them into a data structure and for the consumer
+    to extract them, it is often cleaner to use the built-in multiple-values
+    interfaces. This interface consists of two procedures: values and
+    call-with-values. The former produces multiple values and the later links
+    procedures that produce multiple-value values with the procedures that
+    consume them.
 
     ;; quotes
 
@@ -221,7 +378,7 @@ References
     (string-upcase s)
     (string-downcase s)
     (string-titlecase s)        ;; the word's first character becomes upcase and other characters become lowercase
-    (string->list s)
+    (string->list s)            ;; return a list of characters
     (list->string l)
     (string=? s1 s2 s3 ...)
     (string<? s1 s2 s3 ...)
@@ -246,6 +403,47 @@ References
     All strings are mutable by default, including constants. A program can
     create immutable strings via string->immutable-string. Any attempt to
     modify an immutable string causes an exception to be raised.
+
+    (format fmt arg ...)                      ;; construct a string
+    (format #f fmt arg ...)                   ;; construct a string
+    (format #t fmt arg ...)                   ;; print to current output port
+    (format textual-output-port fmt arg ...)  ;; print to the specified port
+    (printf fmt arg ...)                      ;; print to current output port
+    (fprintf textual-output-port fmt arg ...) ;; print to the specified port
+
+    ChezScheme's implementation of format supports all of Common Lisp format
+    directives except for those specific to the Common Lisp pretty printer.
+    Please consult a Common Lisp reference or the Common Lisp Hyperspec, for
+    complete documentation. A few of the most useful directives are described
+    below.
+
+    "~s"    print as write, it is actually ~mincol,colinc,minpad,padchars
+    "~a"    print as display
+    "~%"    print a newline
+    "~~"    print ~
+    "\n"    print a newline
+    "~f"    print in floating-point notation
+    "~e"    print in scientific notation
+    "~g"    print either floating-point or scientific notation based on the size of the input
+
+    (fasl-write obj binary-output-port)
+    (fasl-read binary-output-port)
+    (fasl-file input-file-name output-file-name)  ;; convert to fasl format
+
+    The procedures write and pretty-print print objects in a human readable
+    format. For objects with external datum representations, the output
+    produced by write and pretty-print is also machine-readable with read.
+    Objects with external datum representations include pairs, symbols,
+    vectors, strings, numbers, characters, booleans, and records but not
+    procedures and ports.
+
+    An alternative fast loading, or fasl, format may be used for objects with
+    external datum representations. The fasl format is not human readable,
+    but it is machine readable and both more compact and more quickly processed
+    by read. This format is always used for compiled code generated by
+    compile-file, but it may also be used for data that needs to be written
+    and read quickly, such as small databases encoded with Scheme data
+    structures.
 
 
     ;; lists and pairs
@@ -562,6 +760,77 @@ References
     ，子模板列表 (S1 ... Sn)，子模板非正式（improper）列表 (S1 ... Sn . T)，
     子模板数组 #(S1 ... Sn)，或省略号。
 
+    (syntax template)
+    #'template
+
+    A syntax expression is like a quote expression except that the values of
+    pattern variables appearing within template are inserted into template,
+    and contextual information is retained in the output to support lexical
+    scoping.
+
+    (free-identifier=? id1 id2)
+    (bound-identifier=? id1 id2)
+
+    Symbolic names alone do not distinguish identifiers unless the identifiers
+    are to be used only as symbolic data. The procedure free-identifier=? and
+    bound-identifier=? are used to compare identifiers according to their
+    intended use as free references or bound identifiers in a given context.
+
+    free-identifier=? is used to determine whether two identifiers would be
+    equivalent if they were to appear as free identifiers in the output of
+    a transformer. Because identifier references are lexically scoped, this
+    means (free-identifier=? id1 id2) is true if and only if the identifiers
+    id1 and id2 refer to the same binding.
+
+    两个相等的自由标识符表示这两个标识符指向同一个绑定，例如下面的例子：
+
+    (define-syntax (cond stx)
+      (syntax-case stx ()
+        ((_ (else-literal expr1 expr2 ...))
+         (and (identifier? #'else-literal) (free-identifier=> #'else-literal #'else))
+         #'(begin expr1 expr2 ...))))
+
+    (define-syntax (cond stx)
+      (syntax-case stx (else)
+        ((_ (else expr1 expr2 ...))
+         #'(begin expr1 expr2 ...))))
+
+    Similarly, bound-identifier=? is used to determine whether two identifiers
+    would be equivalent if they were to appear as bound identifiers in the
+    output of a transformer. In other words, if bound-identifier=? returns true
+    for two identifiers, a binding for one will capture references to the other
+    within its scope. In general, two identifiers are bound-identifier=? only
+    if both are present in the original program or both are introduced by the
+    same transformer application (perhaps implicitly, see datum->syntax).
+    bound-identifier=? can be used for detecting duplicate identifiers in a
+    binding construct or for other preprocessing of a binding construct that
+    requires detecting instances of the bound identifiers.
+
+    (with-syntax ((pattern expr) ...) body1 body2 ...)
+
+    It is sometimes useful to construct a transformer's output in separate
+    pieces, then put the pieces together. with-synatx facilitates this by
+    allowing the creation of local pattern bindings. pattern is identical in
+    form to a syntax-case pattern. The value of each expr is computed and
+    destructured according to the corresponding pattern.
+
+    (define-syntax (with-synatx stx)
+      (syntax-case stx ()
+        ((_ ((p e) ...) b1 b2 ...)
+         #'(syntax-case (list e ...) ()
+             ((p ...) (let () b1 b2 ...))))))
+
+    (datum->syntax template-identifier obj)
+
+    datum->syntax allows a transformer to "bend" lexical scoping rules by
+    creating implicit identifiers that behave as if they were present in
+    the input form, thus permitting the definition of syntactic extensions
+    that introduce visible bindings for or references to identifiers that
+    do not appear explicitly in the input form.
+
+    
+    
+
     (define-syntax a (identifier-syntax <template>))  ;; identifier will expand to <template>
     (define-syntax a
       (identifier-syntax
@@ -569,6 +838,12 @@ References
         ((set! id e) (set-value! e))))  ;; the identifier can be set!
 
     identifier-syntax 是通过 make-variable-transformer 实现的。
+
+    -- TSPL --
+
+    
+
+
 
     (define-syntax keyword transformer)
     (let-syntax ((keyword transformer) ...) <expr> ...)
