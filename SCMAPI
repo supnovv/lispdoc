@@ -7,6 +7,239 @@ References
 [4] How to Debug ChezScheme Programs (https://www.cs.indiana.edu/chezscheme/debug/)
 [5] Common Lisp Hyperspec (http://www.lispworks.com/documentation/HyperSpec/Front/index.htm)
 
+    ;; Basic syntax
+
+    ; normal comment is between a semicolon (;) and the end of the line
+    #| block comments are delimited by #| |# pairs, and may be nested |#
+    #;(datum comments are typically used to comment out individual definitions
+       or expressions). Datum comments may also be nested, though #;#;(a)(b)
+       has the somewhat nonobvious effect of commenting out both (a) and (b).
+    #!r6rs         ;; comment directive
+    #!chezscheme   ;; comment directive, enable chezscheme extensions
+
+    The ChezScheme lexical extensions are disabled in an input stream after
+    an #!r6rs comment directive has been seen, unless a #!chezscheme comment
+    directive has been seen since.
+
+
+    ;; Libraries, Top-level Programs, and Modules
+
+    Libraries are typically stored in the file system, with one library per
+    file, and the library name typically identifiers the file-system path to
+    the library, possibly relative to a default or programmer-specified set
+    of library locations. The exact mechanism by which top-level programs are
+    run and libraries are loaded is implementation-dependent.
+
+    This chapter describes the mechanisms by which libraries and programs are
+    loaded in ChezScheme along with various features for controlling and
+    tracking this process. It also describes the set of built-in libraries
+    and syntactic forms for defining new libraries and top-level programs
+    outside of a library or top-level program file.
+
+    ChezScheme provides two additional libraries: (chezsheme) and
+    (chezscheme csv7). The former can also be referenced as (scheme) and the
+    latter can also be referenced as (scheme csv7).
+
+    The (scheme csv7) should be used only for old code. The (scheme) library
+    exports bindings for every identifier whose binding is described in this
+    document. In most cases where an identifier exported from the (scheme)
+    library corresponds to an identifier exported from one of the RNRS
+    libraries, the binding are identical. In some cases, however, the (scheme)
+    bindings extend the rnrs bindings in some way. For example, the (scheme)
+    syntax-rules form allows its clauses to have fenders, while the (rnrs)
+    syntax-rules form does not. Similarly, the (scheme) current-input-port
+    procedure accepts an optional port argument that, when specified, sets
+    the current input port to port, while the (rnrs) current-input-port
+    procedure does not. When the (scheme) library extends an RNRS binding
+    in some way, the (scheme) library also exports the RNRS version, with the
+    name prefixed by r6rs:, e.g., r6rs:syntax-rules or r6rs:current-input-port.
+
+    A top-level program residing in a file is run by one of three mechanisms:
+    the scheme-script command, the --program command-line argument, or the
+    load-program procedure. A top-level program may be compiled with the
+    compile-program procedure, it copies the #! line from the source file to
+    the object file, followed by a compiled version of the source code. Any
+    libraries upon which the top-level program depends, other than build-in
+    libraries, must be compiled first via compile-file or compile-library.
+    This can be done manually or by setting the parameter compile-imported-
+    libraries to #t before compiling the program. The program must be
+    recompiled if any of the libraries it depends are recompiled. A compiled
+    top-level program can be run just like a source top-level program via
+    each of the mechanisms described above.
+
+    scheme-script program-filename arg ...
+    #! /usr/bin/env scheme-script
+    scheme --program program-filename arg ...
+    #! /usr/bin/scheme --script
+    (load-program string)
+
+    In ChezScheme, a library may also be defined in the REPL or placed in a
+    file to be loaded via load or load-library. The syntax for a library is
+    the same whether the library is placed in its own file and implicitly
+    loaded via import, entered into the REPL, or placed in a file along
+    with other top-level expressions to be evaluated by load.
+
+    In the language of the R6RS, a top-level program is merely an unwrapped
+    sequence of subforms consisting of an import form and a body, delimited
+    only by the boundaries of the file in which it resides. In order for a
+    top-level program to be entered in the REPL or placed in a file to be
+    evaluated by load, ChezSheme allows top-level programs to be enclosed in
+    a top-level-program form.
+
+    (top-level-program import-spec program-body)
+    (library library-spec (export export-spec ...) (import import-spec ...) library-body)
+    import-spec  : import-set
+                 | (for import-set import-level ...)
+    import-level : run
+                 | expand
+                 | (meta level)   ;; level represents an exact integer
+    import-set   : library-spec
+                 | (only import-set identifier ...)     ;; import only identifiers in the library
+                 | (except import-set identifier ...)   ;; import all identifiers in the library except
+                 | (prefix import-set prefix)           ;; add a prefix to the imported identifiers
+                 | (add-prefix import-set prefix)       ;; same as prefix, chezscheme
+                 | (drop-prefix import-set prefix)      ;; chezscheme
+                 | (rename import-set (import-name internal-name) ...)
+                 | (alias import-set (import-name internal-name) ...)   ;; both names can be used, chezscheme
+    export-spec  : identifier
+                 | (rename (internal-name export-name) ...)
+                 | (import import-spec ...)                  ;; chezscheme
+    library-spec : library-ref
+                 | (library library-ref)
+    library-ref  : (identifier identifier ...)
+                 | (identifier identifier ... version-ref)
+    version-ref  : (subversion-ref ... subversion-ref)
+                 | (and version-ref)
+                 | (or version-ref)
+                 | (not version-ref)
+    subversion-ref : (>= subversion)
+                   | (<= subversion)
+                   | (and subversion-ref ...)
+                   | (or subversion-ref ...)
+                   | (not subversion-ref ...)
+
+    (import-only import-spec ...)
+    (indirect-export id indirect-id ...)
+    (implicit-exports #t)
+    (implicit-exports #f)
+
+    (module module-name (export-identifier ...) module-body)
+    (module (export-identifier ...) module-body)
+
+    (include path)
+
+    run and (meta 0) are equivalent and specify that the bindings imported
+    from a library might be referenced by the run-time expressions (define,
+    let, let*, ...). expand and (meta 1) are equivalent and specify that the
+    bindings imported from a library might be referenced by the transformer
+    expressions (define-syntax, let-syntax, or letrec-syntax, ...) of the
+    importing library. (meta 2) specifies that the bindings imported from a
+    library might be referenced by a transformer expression that appears
+    within a transformer expression of the importing library, and so on for
+    higher meta levels. Negative meta levels may also be specified and are
+    needed in certain circumstances when a transformer expands into the
+    transformer for another keyword binding used at a lower meta level.
+
+    A library export may have a non-zero export meta level, in which case the
+    effective import level is the sum of the level specified by for and the
+    export level. The exports of each standard library except (rnrs base) and
+    (rnrs) have export level zero. For (rnrs base), all exports have export
+    level zero except for syntax-rules, identifier-syntax, and their auxiliary
+    keywords _, ..., and set!. set! has export levels zero and one, while
+    the others have export level one. All exports of the (rnrs) library have
+    export levels zero and one.
+
+    It can be difficult for the programmer to specify the import levels that
+    allow a library or top-level program to compile or run properly. Moreover,
+    it is often impossible to cause a library's bindings to be made available
+    when they are needed without causing them to be made available in some
+    cases when they are not needed. Because of this, implementations are
+    permitted to ignore export levels and the for wrapper on an import-set and
+    instead automatically determine.
+    
+    Only one version of a library can be loaded at any given time, and an
+    exception is raised if a library is implicitly loaded via import when
+    another version of the library has already been loaded. ChezScheme permits
+    a different version of the library, or a new instance of the same version,
+    to be entered explicitly into the REPL or loaded explicitly from a file,
+    to facilitate interactive testing and debugging. The programmer should
+    take care to make sure that any code that uses the library is also
+    reentered or reloaded, to make sure that code accesses the bindings of
+    the new instance of the library.
+
+    (library (foo) (export a) (import (rnrs)) (define a 'a-from-foo))
+    (module bar (b) (define b 'b-from-bar))
+    (let () (import (foo) bar) (list a b))   => (a-from-foo b-from-bar)
+
+    Although not required by the R6RS, ChezScheme supports the use of
+    standalone import and export forms. The import forms can appear
+    anywhere other definitions can appear, including within a library
+    body, module body, lambda or other local body, and at top level.
+    The export forms can appear within the definitions of a library or
+    module body to specify additional exports for the library or module.
+
+    The library parameters described below control where import looks when
+    attempting to load a library, whether it compiles the libraries it loads,
+    and whether it displays tracking messages as it performs its search.
+
+    thread parameters: library-directories library-extensions
+                       compile-imported-libraries import-notify
+
+    library-directories determines where the files containing library source
+    and object code are located in the file system, and library-extensions
+    determines the filename extensions for the files holding the code. The
+    values of both parameters are lists of pairs of strings. The first string
+    in each library-directories pair identifier a source-file root directory,
+    and the second identifies the corresponding object-file root directory.
+    Similarly, the first string in each library-extensions pair identifies
+    a source file extension, and the second identifiers the corresponding
+    object-file extension. The full path of a library source or object file
+    consist of the source or object root followed by the components of the
+    library name prefixed by slashes, with the library extension added on the
+    end. For example, for root /usr/lib/scheme, library name (app lib1), and
+    extension .sls, the full path is /usr/lib/scheme/app/lib1.sls. If the
+    library name portion forms an absolute pathname, e.g., ~/.myappinit, the
+    library-directories parameter is ignored and no prefix is added. The
+    initial values of these parameters are shown below.
+
+    (library-directories) => (("." . "."))
+    (library-extensions) => ((".chezscheme.sls" . ".chezscheme.so")
+                             (".ss" . ".so") (".sls" . ".so")
+                             (".scm" . ".so") (".sch" . ".so"))
+
+    The default initial value of the compile-imported-libraries is #f. It can
+    be set to #t vai the command-line option --compile-imported-libraries. When
+    the parameter import-notify is set to a true value, import displays
+    messages to the console-output port as it searches for the file containing
+    each library it needs to load. The default value of this parameter is #f.
+
+    (library-list)  ;; a list of the libraries currently defined
+    (library-version library-ref)
+    (library-exports library-ref)
+
+    ;; system operations
+
+    (eval expr)      ;; use the env returned by interaction-environment
+    (eval expr env)
+    current-eval     ;; thread parameter, it determines the evluation procedure
+                        used by the procedure eval, load, and new-cafe. it is
+                        initially bound to the value of compile
+    (compile expr)   ;; expand, compile, and execute
+    (compile expr env)
+    (interpret expr) ;; interpret the expression, not compile it
+    (interpret expr env)
+    (load path)
+    (load path eval-proc)  ;; load and evaluate the contents of the file,
+                              the file may contain source or object code.
+                              by default, load employs eval to evaluate each
+                              source expression found in a source file.
+                              if eval-proc is specified, load uses this
+                              procedure instead.
+    (load-library path)
+    (load-library path eval-proc)
+    (load-program path)
+    (load-program path eval-proc)
+
 
     ;; definitions
 
